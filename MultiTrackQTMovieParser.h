@@ -268,11 +268,18 @@ namespace MultiTrackQTMovie {
                                                 
                         seek+=swapU32(toU32(seek-4));
                         
-                        if(swapU32(toU32(seek))==this->atom("moov")) {
-                            
-                            unsigned char *moov = seek+4;
-                            this->parseTrack(moov,(swapU32(toU32(moov-8))-4)-3);
-                            
+                        while(true) {
+                            if(swapU32(toU32(seek))==this->atom("mdat")) {
+                                seek+=swapU32(toU32(seek-4));
+                            }
+                            else if(swapU32(toU32(seek))==this->atom("moov")) {
+                                unsigned char *moov = seek+4;
+                                this->parseTrack(moov,(swapU32(toU32(moov-8))-4)-3);                                
+                                break;
+                            }
+                            else {
+                                break;
+                            }
                         }
                     }
                 }
@@ -320,23 +327,40 @@ namespace MultiTrackQTMovie {
                     fread(&buffer,sizeof(unsigned int),1,fp); // 4*8
                         
                     if(swapU32(buffer)==this->atom("mdat")) {
-                                                
+                        
                         fseeko(fp,(4*8)+offset-4,SEEK_SET);
                         fread(&buffer,sizeof(unsigned int),1,fp);
                         int len = swapU32(buffer);
                         fread(&buffer,sizeof(unsigned int),1,fp);
                         
-                        if(swapU32(buffer)==this->atom("moov")) {
+                        while(true) {
                             
-                            unsigned char *moov = new unsigned char[len-4];
-                            fread(moov,sizeof(unsigned char),len-4,fp);
-                            
-                            this->parseTrack(moov,(len-4)-3);
-                            
-                            delete[] moov;
-                            
+                            if(swapU32(buffer)==this->atom("mdat")) {
+                                
+                                fseeko(fp,(4*8)+offset+len-4,SEEK_SET);
+                                fread(&buffer,sizeof(unsigned int),1,fp);
+                                len+=swapU32(buffer);
+                                fread(&buffer,sizeof(unsigned int),1,fp);
+                                
+                            }
+                            else if(swapU32(buffer)==this->atom("moov")) {
+                                
+                                unsigned char *moov = new unsigned char[len-4];
+                                fread(moov,sizeof(unsigned char),len-4,fp);
+                                
+                                this->parseTrack(moov,(len-4)-3);
+                                
+                                delete[] moov;
+                                
+                                break;
+                                
+                            }
+                            else {
+                                
+                                break;
+                                
+                            }
                         }
-                        
                     }
                 }
             }
