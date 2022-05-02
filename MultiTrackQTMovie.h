@@ -241,12 +241,18 @@ namespace MultiTrackQTMovie {
                     NSMutableData *bin = [[NSMutableData alloc] init];
                     Atom moov = this->initAtom(bin,"moov");
                     
+                    unsigned int maxDuration = 0;
+                    for(int n=0; n<this->_info->size(); n++) {
+                        unsigned int duration = (unsigned int)this->_frames[n].size()*(this->TimeScale/(float)((*this->_info)[n].fps));
+                        if(duration>maxDuration) maxDuration = duration;
+                    }
+                    
                     Atom mvhd = this->initAtom(bin,"mvhd");
                     this->setVersionWithFlag(bin);
                     this->setU32(bin,this->CreationTime);
-                    this->setU32(bin,this->ModificationTime);
+                    this->setU32(bin,this->ModificationTime); 
                     this->setU32(bin,this->TimeScale);
-                    this->setU32(bin,(unsigned int)this->_frames[0].size()*1000); // Duration
+                    this->setU32(bin,maxDuration);
                     this->setU32(bin,1<<16); // Preferred rate
                     this->setU16(bin,0); // Preferred volume
                     [bin appendBytes:new unsigned char[10]{0} length:(10)]; // Reserved
@@ -262,7 +268,7 @@ namespace MultiTrackQTMovie {
                     
                     for(int n=0; n<this->_info->size(); n++) {
                         unsigned int track = n+1;
-                        unsigned int Duration = (unsigned int)this->_frames[n].size()*1000;
+                        unsigned int Duration = (unsigned int)this->_frames[n].size()*(this->TimeScale/(float)((*this->_info)[n].fps));
                         
                         Atom trak = this->initAtom(bin,"trak");
                         Atom tkhd = this->initAtom(bin,"tkhd");
