@@ -172,7 +172,7 @@ namespace MultiTrackQTMovie {
                 this->inialized();
             }
             
-            Recorder *add(unsigned char *data,unsigned int length, unsigned int trackid) {
+            Recorder *add(unsigned char *data, unsigned int length, unsigned int trackid, bool padding=true) {
                 if(!this->_isRecorded) {
                     if(this->_isRunning==false) this->_isRunning = true;
                     
@@ -180,7 +180,8 @@ namespace MultiTrackQTMovie {
                         
                         unsigned int size = length;
                         unsigned int diff = 0;
-                        if(length%4!=0) {
+                        
+                        if(padding&&(length%4!=0)) {
                             diff=(((length+3)>>2)<<2)-length;
                             size+=diff;
                         }
@@ -222,7 +223,11 @@ namespace MultiTrackQTMovie {
                 
                 return this;
             }
-            
+        
+            Recorder *add(unsigned char *data, unsigned int length, bool padding=true) {
+                return this->add(data,length,0,padding);
+            };
+        
             void save() {
                 
                 if(this->_isRunning&&!this->_isRecorded) {
