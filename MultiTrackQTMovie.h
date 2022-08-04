@@ -61,8 +61,6 @@ namespace MultiTrackQTMovie {
                 this->_frames = new std::vector<unsigned int>[this->_info->size()];
                 this->_chunks = new std::vector<unsigned long>[this->_info->size()];
             }
-            virtual void add(unsigned int *data,int length) {}
-            virtual void save() {}
             ~VideoRecorder() {
                 for(int k=0; k<this->_info->size(); k++) {
                     this->_frames[k].clear();
@@ -223,11 +221,7 @@ namespace MultiTrackQTMovie {
                 
                 return this;
             }
-        
-            Recorder *add(unsigned char *data, unsigned int length, bool padding=true) {
-                return this->add(data,length,0,padding);
-            };
-        
+            
             void save() {
                 
                 if(this->_isRunning&&!this->_isRecorded) {
