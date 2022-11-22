@@ -1,4 +1,4 @@
-Read/Write MultiTrack QuickTime PNG/JPEG sequences.　　
+Read/Write MultiTrack QuickTime PNG/JPEG sequences.　  　
 Supported AVC1 experimentally.
 
 ### read
