@@ -1,4 +1,5 @@
-Read/Write MultiTrack QuickTime PNG/JPEG sequences.
+Read/Write MultiTrack QuickTime PNG/JPEG sequences.　　
+Supported AVC1 experimentally.
 
 ### read
 
@@ -53,7 +54,7 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-##### Note: iOS
+#### Note: iOS
 
 Need to add two key in info.plist with YES.
 
