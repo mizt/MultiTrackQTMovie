@@ -465,6 +465,26 @@ namespace MultiTrackQTMovie {
                         this->setU32(bin,1); // Number of entries
                         this->setU32(bin,(unsigned int)this->_frames[n].size());
                         this->setU32(bin,(unsigned int)(TimeScale/(*this->_info)[n].fps));
+                        
+                        if(avc1) {
+                            
+                            unsigned int num = (unsigned int)this->_frames[n].size();
+                            this->initAtom(bin,"stss",8+4+4+num*4);
+                            this->setVersionWithFlag(bin);
+                            this->setU32(bin,num);
+                            for(int k=0; k<num; k++) {
+                                this->setU32(bin,k+1); // 1 origin
+                            }
+                            
+                            this->initAtom(bin,"sdtp",8+4+num);
+                            this->setVersionWithFlag(bin);
+                            
+                            for(int k=0; k<num; k++) {
+                                bool Keyframe = true;
+                                this->setU8(bin,(Keyframe)?32:16);
+                            }
+                        }
+                        
                         this->initAtom(bin,"stsc",28);
                         this->setVersionWithFlag(bin);
                         this->setU32(bin,1); // Number of entries
