@@ -1,6 +1,12 @@
 #import <vector>
 #import <string>
 
+#ifdef EMSCRIPTEN
+    typedef unsigned long long U64;
+#else
+    typedef unsigned long U64;
+#endif
+
 #import "MultiTrackQTMovieParser.h"
 
 namespace MultiTrackQTMovie {
@@ -26,7 +32,7 @@ namespace MultiTrackQTMovie {
                 this->bin = [[NSMutableData alloc] init];
             }
         
-            void setU64(NSMutableData *bin, unsigned long value) {
+            void setU64(NSMutableData *bin, U64 value) {
                 [bin appendBytes:new unsigned long[1]{swapU64(value)} length:8];
             }
             
@@ -103,7 +109,7 @@ namespace MultiTrackQTMovie {
                 return this->bin;
             }
             
-            Moov(std::vector<TrackInfo> *info, std::vector<unsigned int> *frames, std::vector<unsigned long> *chunks, NSData *sps, NSData *pps) {
+            Moov(std::vector<TrackInfo> *info, std::vector<U64> *frames, std::vector<U64> *chunks, NSData *sps, NSData *pps) {
                                 
                 this->reset();
                 
@@ -112,7 +118,7 @@ namespace MultiTrackQTMovie {
                 unsigned int maxDuration = 0;
                 for(int n=0; n<info->size(); n++) {
                     
-                    unsigned int TotalFrames = frames[n].size();
+                    unsigned int TotalFrames = (unsigned int)frames[n].size();
                     float FPS = (float)((*info)[n].fps);
                     unsigned int Duration = (unsigned int)(TotalFrames*(this->TimeScale/FPS));
                     
@@ -143,7 +149,7 @@ namespace MultiTrackQTMovie {
                     bool avc1 = (((*info)[n].type)=="avc1")?true:false;
                     unsigned int track = n+1;
 
-                    unsigned int TotalFrames = frames[n].size();
+                    unsigned int TotalFrames = (unsigned int)frames[n].size();
                     float FPS = (float)((*info)[n].fps);
                     unsigned int SampleDelta = (unsigned int)(this->TimeScale/FPS);
                     unsigned int Duration = TotalFrames*SampleDelta;
@@ -338,10 +344,8 @@ namespace MultiTrackQTMovie {
                     this->setU32(bin,0); // If this field is set to 0, then the samples have different sizes, and those sizes are stored in the sample size table.
                     this->setU32(bin,TotalFrames); // Number of entries
                     for(int k=0; k<TotalFrames; k++) {
-                        this->setU32(bin,frames[n][k]);
+                        this->setU32(bin,(unsigned int)frames[n][k]);
                     }
-                    
-                    
                     
                     if(this->is64) {
                         this->setAtomSize(bin,stsz.second);
@@ -359,7 +363,7 @@ namespace MultiTrackQTMovie {
                         this->setVersionWithFlag(bin);
                         this->setU32(bin,(unsigned int)chunks[n].size()); // Number of entries
                         for(int k=0; k<chunks[n].size(); k++) {
-                            this->setU32(bin,chunks[n][k]); // Chunk
+                            this->setU32(bin,(unsigned int)chunks[n][k]); // Chunk
                         }
                         this->setAtomSize(bin,stco.second);
                     }
@@ -391,7 +395,7 @@ namespace MultiTrackQTMovie {
             bool _isRecorded = false;
             
             NSFileHandle *_handle;
-            std::vector<unsigned int> *_frames;
+            std::vector<U64> *_frames;
             
             const unsigned int MDAT_LIMIT = (1024*1024*1024)/10; // 0.1 = 100MB
             unsigned long _mdat_offset = 0;
@@ -429,8 +433,8 @@ namespace MultiTrackQTMovie {
                 if(fileName) this->_fileName = fileName;
                 else this->_fileName = [NSString stringWithFormat:@"%@.mov",this->filename()];
                 this->_info = info;
-                this->_frames = new std::vector<unsigned int>[this->_info->size()];
-                this->_chunks = new std::vector<unsigned long>[this->_info->size()];
+                this->_frames = new std::vector<U64>[this->_info->size()];
+                this->_chunks = new std::vector<U64>[this->_info->size()];
                 
                 if(sps) this->_sps = sps;
                 if(pps) this->_pps = pps;
@@ -499,8 +503,8 @@ namespace MultiTrackQTMovie {
                     
                     if(trackid>=0&&trackid<this->_info->size()) {
                         
-                        unsigned int size = length;
-                        unsigned int diff = 0;
+                        U64 size = length;
+                        U64 diff = 0;
                         
                         if(padding&&(length%4!=0)) {
                             diff=(((length+3)>>2)<<2)-length;

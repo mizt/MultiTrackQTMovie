@@ -1,11 +1,7 @@
 #import <vector>
 #import <string>
 
-#ifdef EMSCRIPTEN
-    typedef unsigned long long U64;
-#else
-    typedef unsigned long U64;
-#endif
+
 
 namespace MultiTrackQTMovie {
     
