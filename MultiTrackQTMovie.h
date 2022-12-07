@@ -1,67 +1,128 @@
 #import <vector>
 #import <string>
 
+#define USE_VECTOR
+
 #ifdef EMSCRIPTEN
     typedef unsigned long long U64;
+    typedef long long S64;
 #else
     typedef unsigned long U64;
+    typedef long S64;
 #endif
 
 #import "MultiTrackQTMovieParser.h"
 
 namespace MultiTrackQTMovie {
     
-    typedef std::pair<std::string,unsigned int> Atom;
+    typedef std::pair<std::string,U64> Atom;
 
     // https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html
     class Moov {
         
         private:
-        
+
+#ifdef USE_VECTOR
+            std::vector<unsigned char> bin;
+            unsigned int CreationTime = 3061152000;
+#else
             NSMutableData *bin = nil;
-            
+            unsigned int CreationTime = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1904;
+#endif
+        
             const bool is64 = true;
             const int Transfer = 1;
-            unsigned int CreationTime = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1904;
             unsigned int ModificationTime = CreationTime;
             unsigned int TimeScale = 30000;
             unsigned short Language = 0;
             
             void reset() {
+#ifdef USE_VECTOR
+                this->bin.clear();
+#else
                 if(this->bin) this->bin = nil; 
                 this->bin = [[NSMutableData alloc] init];
+#endif
             }
         
             void setU64(U64 value) {
+#ifdef USE_VECTOR
+                bin.push_back((value>>56)&0xFF);
+                bin.push_back((value>>48)&0xFF);
+                bin.push_back((value>>40)&0xFF);
+                bin.push_back((value>>32)&0xFF);
+                bin.push_back((value>>24)&0xFF);
+                bin.push_back((value>>16)&0xFF);
+                bin.push_back((value>>8)&0xFF);
+                bin.push_back((value)&0xFF);
+#else
                 [this->bin appendBytes:new unsigned long[1]{swapU64(value)} length:8];
+#endif
             }
             
             void setU32(unsigned int value) {
+#ifdef USE_VECTOR
+                bin.push_back((value>>24)&0xFF);
+                bin.push_back((value>>16)&0xFF);
+                bin.push_back((value>>8)&0xFF);
+                bin.push_back((value)&0xFF);
+#else
                 [this->bin appendBytes:new unsigned int[1]{swapU32(value)} length:4];
+#endif
             }
             
             void setU16(unsigned short value) {
+#ifdef USE_VECTOR
+                bin.push_back((value>>8)&0xFF);
+                bin.push_back((value)&0xFF);
+#else
                 [this->bin appendBytes:new unsigned short[1]{swapU16(value)} length:2];
+#endif
             }
             
-            void setU8(NSMutableData *bin, unsigned char value) {
+            void setU8(unsigned char value) {
+#ifdef USE_VECTOR
+                bin.push_back(value);
+#else
                 [bin appendBytes:new unsigned char[1]{value} length:1];
+#endif
             }
             
             Atom initAtom(std::string str, unsigned int size=0, bool dump=false) {
                 assert(str.length()<=4);
-                unsigned int pos = (unsigned int)[bin length];
-                [this->bin appendBytes:new unsigned int[1]{swapU32(size)} length:4];
-                setString(str);
-                if(dump) NSLog(@"%s,%d",str.c_str(),pos);
+#ifdef USE_VECTOR
+                U64 pos = this->bin.size();
+#else
+                U64 pos = (unsigned int)[bin length];
+#endif
+                this->setU32(size);
+                //[this->bin appendBytes:new unsigned int[1]{swapU32(size)} length:4];
+                this->setString(str);
+                if(dump) NSLog(@"%s,%lu",str.c_str(),pos);
                 return std::make_pair(str,pos);
             }
             
-            void setAtomSize(unsigned int pos) {
+            void setAtomSize(U64 pos) {
+#ifdef USE_VECTOR
+                unsigned int size = (unsigned int)(this->bin.size()-pos);
+                this->bin[pos+0] = (size>>24)&0xFF;
+                this->bin[pos+1] = (size>>16)&0xFF;
+                this->bin[pos+2] = (size>>8)&0xFF;
+                this->bin[pos+3] = size&0xFF;
+#else
                 *(unsigned int *)(((unsigned char *)[this->bin bytes])+pos) = swapU32(((unsigned int)this->bin.length)-pos);
+#endif
             }
         
             void setString(std::string str, unsigned int length=4) {
+#ifdef USE_VECTOR
+                unsigned char *s = (unsigned char *)str.c_str();
+                for(S64 n=0; n<str.length(); n++) bin.push_back(s[n]);
+                S64 len = length-str.length();
+                if(len>=1) {
+                    while(len--) bin.push_back(0);
+                }
+#else
                 [this->bin appendBytes:(unsigned char *)str.c_str() length:str.length()];
                 int len = length-(int)str.length();
                 if(len>=1) {
@@ -69,51 +130,94 @@ namespace MultiTrackQTMovie {
                         [this->bin appendBytes:new unsigned char[1]{0} length:1];
                     }
                 }
+#endif
             }
             
             void setPascalString(std::string str) {
                 assert(str.length()<255);
+#ifdef USE_VECTOR
+                bin.push_back(str.size());
+                this->setString(str,(unsigned int)str.size());
+#else
                 [this->bin appendBytes:new unsigned char[1]{(unsigned char)str.size()} length:1];
-                setString(str,(unsigned int)str.size());
+                this->setString(str,(unsigned int)str.size());
+#endif
             }
             
             void setCompressorName(std::string str) {
                 assert(str.length()<32);
+#ifdef USE_VECTOR
+                this->setPascalString(str);
+                int len = 31-(int)str.length();
+                while(len--) bin.push_back(0);
+#else
                 setPascalString(str);
                 int len = 31-(int)str.length();
                 while(len--) {
                     [this->bin appendBytes:new unsigned char[1]{0} length:1];
                 }
+#endif
             }
             
             void setMatrix() {
                 // All values in the matrix are 32-bit fixed-point numbers divided as 16.16, except for the {u, v, w} column, which contains 32-bit fixed-point numbers divided as 2.30.
+#ifdef USE_VECTOR
+                this->setU32(0x00010000);
+                this->setU32(0x00000000);
+                this->setU32(0x00000000);
+                this->setU32(0x00000000);
+                this->setU32(0x00010000);
+                this->setU32(0x00000000);
+                this->setU32(0x00000000);
+                this->setU32(0x00000000);
+                this->setU32(0x01000000);
+                
+#else
                 [this->bin appendBytes:new unsigned int[4*9]{
                     swapU32(0x00010000),swapU32(0x00000000),swapU32(0x00000000),
                     swapU32(0x00000000),swapU32(0x00010000),swapU32(0x00000000),
                     swapU32(0x00000000),swapU32(0x00000000),swapU32(0x01000000)
                 } length:(4*9)];
+#endif
             }
             
             void setVersionWithFlag(unsigned char version=0, unsigned int flag=0) {
+#ifdef USE_VECTOR
+                bin.push_back(version);
+                bin.push_back((flag>>16)&0xFF);
+                bin.push_back((flag>>8)&0xFF);
+                bin.push_back(flag&0xFF);
+#else
+                
                 [this->bin appendBytes:new unsigned char[4]{
                     version,
                     (unsigned char)((flag>>16)&0xFF),
                     (unsigned char)((flag>>8)&0xFF),
                     (unsigned char)(flag&0xFF)} length:(1+3)];
+#endif
             }
         
-            void setZero(unsigned int length) {
-                for(int n=0; n<length; n++) {
+            void setZero(U64 length) {
+#ifdef USE_VECTOR
+                for(U64 n=0; n<length; n++) bin.push_back(0);
+#else
+                for(U64 n=0; n<length; n++) {
                     [this->bin appendBytes:new unsigned char[1]{0} length:1];
                 }
+#endif
             }
             
         public:
-        
+ 
+#ifdef USE_VECTOR
+            std::vector<unsigned char> *get() {
+                return &this->bin;
+            }
+#else
             NSMutableData *get() {
                 return this->bin;
             }
+#endif
             
             Moov(std::vector<TrackInfo> *info, std::vector<U64> *frames, std::vector<U64> *chunks, std::vector<bool> *keyframes, NSData *sps, NSData *pps) {
                                 
@@ -273,19 +377,37 @@ namespace MultiTrackQTMovie {
                     if(avc1&&sps&&pps) {
                         
                         Atom avcC = this->initAtom("avcC");
-                        this->setU8(bin,1);
-                        this->setU8(bin,66);
-                        this->setU8(bin,0);
-                        this->setU8(bin,40);
-                        this->setU8(bin,0xFF); // 3
-                        this->setU8(bin,0xE1); // 1
+                        this->setU8(1);
+                        this->setU8(66);
+                        this->setU8(0);
+                        this->setU8(40);
+                        this->setU8(0xFF); // 3
+                        this->setU8(0xE1); // 1
                         
+#ifdef USE_VECTOR
+                        this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
+                        
+                        unsigned char *bytes = ((unsigned char *)[sps bytes])+4;
+                        for(U64 n=0; n<[sps length]-4; n++) {
+                            this->bin.push_back(bytes[n]);
+                        }
+                        
+                        this->setU8(1); // 1
+                        this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
+                        
+                        bytes = ((unsigned char *)[pps bytes])+4;
+                        for(U64 n=0; n<[pps length]-4; n++) {
+                            this->bin.push_back(bytes[n]);
+                        }
+                        
+#else
                         this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
                         [this->bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
                         
-                        this->setU8(bin,1); // 1
+                        this->setU8(1); // 1
                         this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
                         [this->bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
+#endif
                         
                         this->setAtomSize(avcC.second);
                     }
@@ -332,7 +454,7 @@ namespace MultiTrackQTMovie {
                         this->setVersionWithFlag();
                         
                         for(int k=0; k<TotalFrames; k++) {
-                            this->setU8(bin,(keyframes[n][k])?32:16);
+                            this->setU8((keyframes[n][k])?32:16);
                         }
                     }
                     
@@ -597,8 +719,15 @@ namespace MultiTrackQTMovie {
                     Moov *moov = new Moov(this->_info,this->_frames,this->_chunks,this->_keyframes,this->_sps,this->_pps);
                     
                     [this->_handle seekToEndOfFile];
-                    [this->_handle writeData:moov->get()];
                     
+#ifdef USE_VECTOR
+                    std::vector<unsigned char> *bin = moov->get();
+                    [this->_handle writeData:[[NSData alloc] initWithBytes:bin->data() length:bin->size()]];
+
+#else
+                    [this->_handle writeData:moov->get()];
+
+#endif
                     delete moov;
                     
                     this->_isRunning = false;
