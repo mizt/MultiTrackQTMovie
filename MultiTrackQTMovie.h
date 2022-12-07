@@ -7,6 +7,7 @@ namespace MultiTrackQTMovie {
     
     typedef std::pair<std::string,unsigned int> Atom;
 
+    // https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html
     class Moov {
         
         private:
@@ -103,15 +104,19 @@ namespace MultiTrackQTMovie {
             }
             
             Moov(std::vector<TrackInfo> *info, std::vector<unsigned int> *frames, std::vector<unsigned long> *chunks, NSData *sps, NSData *pps) {
-                
+                                
                 this->reset();
                 
                 Atom moov = this->initAtom(bin,"moov");
                 
                 unsigned int maxDuration = 0;
                 for(int n=0; n<info->size(); n++) {
-                    unsigned int duration = (unsigned int)frames[n].size()*(this->TimeScale/(float)((*info)[n].fps));
-                    if(duration>maxDuration) maxDuration = duration;
+                    
+                    unsigned int TotalFrames = frames[n].size();
+                    float FPS = (float)((*info)[n].fps);
+                    unsigned int Duration = (unsigned int)(TotalFrames*(this->TimeScale/FPS));
+                    
+                    if(Duration>maxDuration) maxDuration = Duration;
                 }
                 
                 Atom mvhd = this->initAtom(bin,"mvhd");
@@ -136,9 +141,12 @@ namespace MultiTrackQTMovie {
                 for(int n=0; n<info->size(); n++) {
                     
                     bool avc1 = (((*info)[n].type)=="avc1")?true:false;
-                    
                     unsigned int track = n+1;
-                    unsigned int Duration = (unsigned int)frames[n].size()*(this->TimeScale/(float)((*info)[n].fps));
+
+                    unsigned int TotalFrames = frames[n].size();
+                    float FPS = (float)((*info)[n].fps);
+                    unsigned int SampleDelta = (unsigned int)(this->TimeScale/FPS);
+                    unsigned int Duration = TotalFrames*SampleDelta;
                     
                     Atom trak = this->initAtom(bin,"trak");
                     Atom tkhd = this->initAtom(bin,"tkhd");
@@ -252,7 +260,7 @@ namespace MultiTrackQTMovie {
                     this->setU16(bin,((*info)[n].depth)); // Depth
                     this->setU16(bin,0xFFFF); // Color table ID
                     
-                    if(avc1) {
+                    if(avc1&&sps&&pps) {
                         
                         Atom avcC = initAtom(bin,("avcC"));
                         this->setU8(bin,1);
@@ -271,7 +279,6 @@ namespace MultiTrackQTMovie {
                         
                         this->setAtomSize(bin,avcC.second);
                     }
-                    
                     
                     this->initAtom(bin,"colr",18);
                     this->setString(bin,"nclc");
@@ -294,26 +301,27 @@ namespace MultiTrackQTMovie {
                     this->setU32(bin,0); // Some sample descriptions terminate with four zero bytes that are not otherwise indicated.
                     this->setAtomSize(bin,table.second);
                     this->setAtomSize(bin,stsd.second);
+                    
                     this->initAtom(bin,"stts",24);
                     this->setVersionWithFlag(bin);
+                    
                     this->setU32(bin,1); // Number of entries
-                    this->setU32(bin,(unsigned int)frames[n].size());
-                    this->setU32(bin,(unsigned int)(TimeScale/(*info)[n].fps));
+                    this->setU32(bin,TotalFrames);
+                    this->setU32(bin,SampleDelta);
                     
                     if(avc1) {
                         
-                        unsigned int num = (unsigned int)frames[n].size();
-                        this->initAtom(bin,"stss",8+4+4+num*4);
+                        this->initAtom(bin,"stss",8+4+4+TotalFrames*4);
                         this->setVersionWithFlag(bin);
-                        this->setU32(bin,num);
-                        for(int k=0; k<num; k++) {
+                        this->setU32(bin,TotalFrames);
+                        for(int k=0; k<TotalFrames; k++) {
                             this->setU32(bin,k+1); // 1 origin
                         }
                         
-                        this->initAtom(bin,"sdtp",8+4+num);
+                        this->initAtom(bin,"sdtp",8+4+TotalFrames);
                         this->setVersionWithFlag(bin);
                         
-                        for(int k=0; k<num; k++) {
+                        for(int k=0; k<TotalFrames; k++) {
                             bool Keyframe = true;
                             this->setU8(bin,(Keyframe)?32:16);
                         }
@@ -328,10 +336,12 @@ namespace MultiTrackQTMovie {
                     Atom stsz = this->initAtom(bin,"stsz",20);
                     this->setVersionWithFlag(bin);
                     this->setU32(bin,0); // If this field is set to 0, then the samples have different sizes, and those sizes are stored in the sample size table.
-                    this->setU32(bin,(unsigned int)frames[n].size()); // Number of entries
-                    for(int k=0; k<frames[n].size(); k++) {
+                    this->setU32(bin,TotalFrames); // Number of entries
+                    for(int k=0; k<TotalFrames; k++) {
                         this->setU32(bin,frames[n][k]);
                     }
+                    
+                    
                     
                     if(this->is64) {
                         this->setAtomSize(bin,stsz.second);
@@ -436,7 +446,6 @@ namespace MultiTrackQTMovie {
             }
     };
     
-    // https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html
     class Recorder : public VideoRecorder {
         
         protected:
@@ -568,10 +577,7 @@ namespace MultiTrackQTMovie {
                         [this->_handle seekToEndOfFile];
                         this->_mdat = nil;
                     }
-                    
-                    
-                    //std::vector<TrackInfo> *info, std::vector<unsigned int> *frames, std::vector<unsigned long> *chunks, NSData *sps, NSData *pps
-                    
+                                        
                     Moov *moov = new Moov(this->_info,this->_frames,this->_chunks,this->_sps,this->_pps);
                     
                     [this->_handle seekToEndOfFile];
