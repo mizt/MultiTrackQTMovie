@@ -49,7 +49,6 @@ namespace MultiTrackQTMovie {
             }
             
             Atom initAtom(std::string str, unsigned int size=0, bool dump=false) {
-                
                 assert(str.length()<=4);
                 unsigned int pos = (unsigned int)[bin length];
                 [this->bin appendBytes:new unsigned int[1]{swapU32(size)} length:4];
@@ -103,6 +102,12 @@ namespace MultiTrackQTMovie {
                     (unsigned char)((flag>>8)&0xFF),
                     (unsigned char)(flag&0xFF)} length:(1+3)];
             }
+        
+            void setZero(unsigned int length) {
+                for(int n=0; n<length; n++) {
+                    [this->bin appendBytes:new unsigned char[1]{0} length:1];
+                }
+            }
             
         public:
         
@@ -132,7 +137,7 @@ namespace MultiTrackQTMovie {
                 this->setU32(maxDuration);
                 this->setU32(1<<16); // Preferred rate
                 this->setU16(0); // Preferred volume
-                [bin appendBytes:new unsigned char[10]{0} length:(10)]; // Reserved
+                this->setZero(10); // Reserved
                 this->setMatrix();
                 this->setU32(0); // Preview time
                 this->setU32(0); // Preview duration
@@ -159,9 +164,9 @@ namespace MultiTrackQTMovie {
                     this->setU32(CreationTime);
                     this->setU32(ModificationTime);
                     this->setU32(track); // Track id
-                    [bin appendBytes:new unsigned int[1]{0} length:(4)]; // Reserved
+                    this->setZero(4); // Reserved
                     this->setU32(Duration);
-                    [bin appendBytes:new unsigned int[2]{0} length:(8)]; // Reserved
+                    this->setZero(8); // Reserved
                     this->setU16(0); // Layer
                     this->setU16(0); // Alternate group
                     this->setU16(0); // Volume
@@ -208,7 +213,7 @@ namespace MultiTrackQTMovie {
                     this->setString("mhlr");
                     this->setString("vide");
                     this->setU32(0); // Reserved
-                    [bin appendBytes:new unsigned int[2]{0,0} length:8]; // Reserved
+                    this->setZero(8); // Reserved
                     this->setPascalString("Video");
                     this->setAtomSize(hdlr.second);
                     Atom minf = this->initAtom("minf");
@@ -224,7 +229,7 @@ namespace MultiTrackQTMovie {
                     this->setString("dhlr");
                     this->setString("alis");
                     this->setU32(0); // Reserved 0
-                    [bin appendBytes:new unsigned int[2]{0,0} length:8]; // Reserved
+                    this->setZero(8); // Reserved
                     this->setPascalString("Handler");
                     this->setAtomSize(hdlr.second);
                     Atom dinf = this->initAtom("dinf");
@@ -241,7 +246,7 @@ namespace MultiTrackQTMovie {
                     this->setU32(1); // Number of entries
                     
                     Atom table = initAtom(((*info)[n].type));
-                    [bin appendBytes:new unsigned char[6]{0,0,0,0,0,0} length:(6)]; // Reserved
+                    this->setZero(6); // Reserved
                     this->setU16(1); // Data reference index
                     this->setU16(0); // Version
                     this->setU16(0); // Revision level
@@ -252,7 +257,7 @@ namespace MultiTrackQTMovie {
                     this->setU16(((*info)[n].height));
                     this->setU32(72<<16); // Horizontal resolution
                     this->setU32(72<<16); // Vertical resolution
-                    [bin appendBytes:new unsigned int[1]{0} length:4];
+                    this->setZero(4);
                     this->setU16(1); // Frame count
                     
                     if(!avc1) {
@@ -276,11 +281,11 @@ namespace MultiTrackQTMovie {
                         this->setU8(bin,0xE1); // 1
                         
                         this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
-                        [bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
+                        [this->bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
                         
                         this->setU8(bin,1); // 1
                         this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
-                        [bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
+                        [this->bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
                         
                         this->setAtomSize(avcC.second);
                     }
