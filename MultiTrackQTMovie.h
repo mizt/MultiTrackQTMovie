@@ -109,7 +109,7 @@ namespace MultiTrackQTMovie {
                 return this->bin;
             }
             
-            Moov(std::vector<TrackInfo> *info, std::vector<U64> *frames, std::vector<U64> *chunks, NSData *sps, NSData *pps) {
+            Moov(std::vector<TrackInfo> *info, std::vector<U64> *frames, std::vector<U64> *chunks, std::vector<bool> *keyframes, NSData *sps, NSData *pps) {
                                 
                 this->reset();
                 
@@ -117,11 +117,9 @@ namespace MultiTrackQTMovie {
                 
                 unsigned int maxDuration = 0;
                 for(int n=0; n<info->size(); n++) {
-                    
                     unsigned int TotalFrames = (unsigned int)frames[n].size();
                     float FPS = (float)((*info)[n].fps);
                     unsigned int Duration = (unsigned int)(TotalFrames*(this->TimeScale/FPS));
-                    
                     if(Duration>maxDuration) maxDuration = Duration;
                 }
                 
@@ -328,8 +326,7 @@ namespace MultiTrackQTMovie {
                         this->setVersionWithFlag(bin);
                         
                         for(int k=0; k<TotalFrames; k++) {
-                            bool Keyframe = true;
-                            this->setU8(bin,(Keyframe)?32:16);
+                            this->setU8(bin,(keyframes[n][k])?32:16);
                         }
                     }
                     
@@ -398,11 +395,13 @@ namespace MultiTrackQTMovie {
             std::vector<U64> *_frames;
             
             const unsigned int MDAT_LIMIT = (1024*1024*1024)/10; // 0.1 = 100MB
-            unsigned long _mdat_offset = 0;
+            U64 _mdat_offset = 0;
             NSMutableData *_mdat = nil;
             
-            unsigned long _chunk_offset = 0;
-            std::vector<unsigned long> *_chunks;
+            U64 _chunk_offset = 0;
+            std::vector<U64> *_chunks;
+        
+            std::vector<bool> *_keyframes;
             
             std::vector<TrackInfo> *_info;
             
@@ -428,14 +427,15 @@ namespace MultiTrackQTMovie {
             
         public:
             
-            VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info, NSData *sps = nil, NSData *pps = nil) {
+            VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info, NSData *sps=nil, NSData *pps=nil) {
                 
                 if(fileName) this->_fileName = fileName;
                 else this->_fileName = [NSString stringWithFormat:@"%@.mov",this->filename()];
                 this->_info = info;
                 this->_frames = new std::vector<U64>[this->_info->size()];
                 this->_chunks = new std::vector<U64>[this->_info->size()];
-                
+                this->_keyframes = new std::vector<bool>[this->_info->size()];
+                 
                 if(sps) this->_sps = sps;
                 if(pps) this->_pps = pps;
 
@@ -444,9 +444,12 @@ namespace MultiTrackQTMovie {
                 for(int k=0; k<this->_info->size(); k++) {
                     this->_frames[k].clear();
                     this->_chunks[k].clear();
+                    this->_keyframes[k].clear();
                 }
                 delete[] this->_frames;
                 delete[] this->_chunks;
+                delete[] this->_keyframes;
+
             }
     };
     
@@ -544,6 +547,9 @@ namespace MultiTrackQTMovie {
                         
                         this->_chunks[trackid].push_back(this->_chunk_offset);
                         
+                        this->_keyframes[trackid].push_back(keyframe);
+
+                        
                         [this->_mdat appendBytes:data length:length];
                         if(diff) {
                             [this->_mdat appendBytes:new unsigned char[diff]{0} length:diff];
@@ -582,7 +588,7 @@ namespace MultiTrackQTMovie {
                         this->_mdat = nil;
                     }
                                         
-                    Moov *moov = new Moov(this->_info,this->_frames,this->_chunks,this->_sps,this->_pps);
+                    Moov *moov = new Moov(this->_info,this->_frames,this->_chunks,this->_keyframes,this->_sps,this->_pps);
                     
                     [this->_handle seekToEndOfFile];
                     [this->_handle writeData:moov->get()];
