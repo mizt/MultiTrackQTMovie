@@ -32,8 +32,8 @@ namespace MultiTrackQTMovie {
                 this->bin = [[NSMutableData alloc] init];
             }
         
-            void setU64(NSMutableData *bin, U64 value) {
-                [bin appendBytes:new unsigned long[1]{swapU64(value)} length:8];
+            void setU64(U64 value) {
+                [this->bin appendBytes:new unsigned long[1]{swapU64(value)} length:8];
             }
             
             void setU32(unsigned int value) {
@@ -351,7 +351,7 @@ namespace MultiTrackQTMovie {
                         this->setVersionWithFlag();
                         this->setU32((unsigned int)chunks[n].size()); // Number of entries
                         for(int k=0; k<chunks[n].size(); k++) {
-                            this->setU64(bin,chunks[n][k]); // Chunk
+                            this->setU64(chunks[n][k]); // Chunk
                         }
                         this->setAtomSize(co64.second);
                     }
