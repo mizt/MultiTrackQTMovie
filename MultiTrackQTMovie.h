@@ -30,11 +30,11 @@ namespace MultiTrackQTMovie {
         unsigned int CreationTime = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1904;
     #endif
         
-        const bool is64 = true;
+        const bool is64 = false;
         const int Transfer = 1;
         unsigned int ModificationTime = CreationTime;
         unsigned int TimeScale = 30000;
-        unsigned short Language = 0;
+        unsigned short Language = 21956;
         
         void reset() {
     #ifdef USE_VECTOR
@@ -168,13 +168,12 @@ namespace MultiTrackQTMovie {
             this->setU32(0x00000000);
             this->setU32(0x00000000);
             this->setU32(0x00000000);
-            this->setU32(0x01000000);
-            
+            this->setU32(0x40000000);
     #else
             [this->bin appendBytes:new unsigned int[4*9]{
                 swapU32(0x00010000),swapU32(0x00000000),swapU32(0x00000000),
                 swapU32(0x00000000),swapU32(0x00010000),swapU32(0x00000000),
-                swapU32(0x00000000),swapU32(0x00000000),swapU32(0x01000000)
+                swapU32(0x00000000),swapU32(0x00000000),swapU32(0x40000000)
             } length:(4*9)];
     #endif
         }
@@ -186,7 +185,6 @@ namespace MultiTrackQTMovie {
             bin.push_back((flag>>8)&0xFF);
             bin.push_back(flag&0xFF);
     #else
-            
             [this->bin appendBytes:new unsigned char[4]{
                 version,
                 (unsigned char)((flag>>16)&0xFF),
@@ -386,6 +384,7 @@ namespace MultiTrackQTMovie {
                     this->setU8(0xE1); // 1
                     
     #ifdef USE_VECTOR
+                    
                     this->setU16(swapU32(*((unsigned int *)sps))&0xFFFF);
                     unsigned char *bytes = ((unsigned char *)sps)+4;
                     for(U64 n=0; n<sps_size-4; n++) {
@@ -438,12 +437,20 @@ namespace MultiTrackQTMovie {
                 
                 if(avc1) {
                     
-                    this->initAtom("stss",8+4+4+TotalFrames*4);
-                    this->setVersionWithFlag();
-                    this->setU32(TotalFrames);
+                    unsigned int TotalKeyframes = 0;
                     for(int k=0; k<TotalFrames; k++) {
-                        this->setU32(k+1); // 1 origin
+                        if(keyframes[n][k]) TotalKeyframes++;
                     }
+                    
+                    this->initAtom("stss",8+4+4+TotalKeyframes*4);
+                    this->setVersionWithFlag();
+                    
+                    this->setU32(TotalKeyframes);
+                    
+                    for(int k=0; k<TotalFrames; k++) {
+                        if(keyframes[n][k]) this->setU32(k+1); // 1 origin
+                    }
+                    
                     
                     this->initAtom("sdtp",8+4+TotalFrames);
                     this->setVersionWithFlag();
@@ -457,7 +464,7 @@ namespace MultiTrackQTMovie {
                 this->setVersionWithFlag();
                 this->setU32(1); // Number of entries
                 this->setU32(1); // First chunk
-                this->setU32(1); // Samples per chunk
+                this->setU32(TotalFrames); // Samples per chunk
                 this->setU32(1); // Sample description ID
                 Atom stsz = this->initAtom("stsz",20);
                 this->setVersionWithFlag();
@@ -467,27 +474,41 @@ namespace MultiTrackQTMovie {
                     this->setU32((unsigned int)frames[n][k]);
                 }
                 
-                if(this->is64) {
-                    this->setAtomSize(stsz.second);
-                    Atom co64 = this->initAtom("co64");
-                    this->setVersionWithFlag();
-                    this->setU32((unsigned int)chunks[n].size()); // Number of entries
-                    for(int k=0; k<chunks[n].size(); k++) {
-                        this->setU64(chunks[n][k]); // Chunk
-                    }
-                    this->setAtomSize(co64.second);
-                }
-                else {
+                if(avc1) {
+                
                     this->setAtomSize(stsz.second);
                     Atom stco = this->initAtom("stco");
                     this->setVersionWithFlag();
-                    this->setU32((unsigned int)chunks[n].size()); // Number of entries
-                    for(int k=0; k<chunks[n].size(); k++) {
-                        this->setU32((unsigned int)chunks[n][k]); // Chunk
-                    }
+                    this->setU32(1); // Number of entries
+                    this->setU32((unsigned int)chunks[n][0]); 
                     this->setAtomSize(stco.second);
                 }
-                
+                else {
+                    
+                    if(this->is64) {
+                        this->setAtomSize(stsz.second);
+                        Atom co64 = this->initAtom("co64");
+                        this->setVersionWithFlag();
+                        this->setU32((unsigned int)chunks[n].size()); // Number of entries
+                        for(int k=0; k<chunks[n].size(); k++) {
+                            this->setU64(chunks[n][k]); // Chunk
+                        }
+                        this->setAtomSize(co64.second);
+                    }
+                    else {
+                        this->setAtomSize(stsz.second);
+                        Atom stco = this->initAtom("stco");
+                        this->setVersionWithFlag();
+                        
+                        
+                        this->setU32((unsigned int)chunks[n].size()); // Number of entries
+                        for(int k=0; k<chunks[n].size(); k++) {
+                            this->setU32((unsigned int)chunks[n][k]); // Chunk
+                        }
+                        this->setAtomSize(stco.second);
+                    }
+                }
+                        
                 this->setAtomSize(minf.second);
                 this->setAtomSize(stbl.second);
                 this->setAtomSize(mdia.second);
@@ -621,7 +642,7 @@ namespace MultiTrackQTMovie {
                 this->inialized();
             }
             
-            Recorder *add(unsigned char *data, unsigned long length, unsigned int trackid, bool keyframe=true, bool padding=true) {
+            Recorder *add(unsigned char *data, unsigned long length, unsigned int trackid, bool keyframe=true, bool padding=false) {
                 
                 if(!this->_isRecorded) {
                     
@@ -737,3 +758,4 @@ namespace MultiTrackQTMovie {
 
 };
 
+        
