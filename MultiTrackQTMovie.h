@@ -606,13 +606,6 @@ namespace MultiTrackQTMovie {
             void inialized() {
                 
                 NSMutableData *bin = [[NSMutableData alloc] init];
-                /*
-                this->initAtom("ftyp",20);
-                this->setString(bin,"qt  ",4);
-                this->setU32(0);
-                this->setString(bin,"qt  ",4);
-                this->initAtom("wide",8);
-                */
                 
                 [bin appendBytes:new unsigned int[7]{
                     swapU32(0x00000014), // 20
