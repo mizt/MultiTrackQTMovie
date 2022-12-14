@@ -1,10 +1,13 @@
-#import <vector>
-#import <string>
-
-
+#ifdef EMSCRIPTEN
+    typedef unsigned long long U64;
+    typedef long long S64;
+#else
+    typedef unsigned long U64;
+    typedef long S64;
+#endif
 
 namespace MultiTrackQTMovie {
-    
+
     typedef struct {
         unsigned short width;
         unsigned short height;
@@ -74,6 +77,5 @@ namespace MultiTrackQTMovie {
     unsigned short swapU16(unsigned short n) {
         return ((n>>8)&0xFF)|((n&0xFF)<<8);
     }
-    
-};
 
+}

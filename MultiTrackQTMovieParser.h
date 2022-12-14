@@ -4,7 +4,7 @@
 #import "MultiTrackQTMovieUtils.h"
 
 namespace MultiTrackQTMovie {
-    
+
     class Parser {
         
         private:
