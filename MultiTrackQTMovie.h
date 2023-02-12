@@ -2,7 +2,6 @@
 #import <string>
 
 #import "MultiTrackQTMovieUtils.h"
-//#import "MultiTrackQTMovieParser.h"
 #import "MultiTrackQTMovieAtomUtils.h"
 
 namespace MultiTrackQTMovie {
@@ -31,6 +30,7 @@ namespace MultiTrackQTMovie {
             
             std::vector<TrackInfo> *_info;
             
+            NSData *_vps = nil;
             NSData *_sps = nil;
             NSData *_pps = nil;
         
@@ -53,7 +53,7 @@ namespace MultiTrackQTMovie {
             
         public:
             
-            VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info, NSData *sps=nil, NSData *pps=nil) {
+            VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info, NSData *sps=nil, NSData *pps=nil, NSData *vps=nil) {
                 
                 if(fileName) this->_fileName = fileName;
                 else this->_fileName = [NSString stringWithFormat:@"%@.mov",this->filename()];
@@ -62,6 +62,8 @@ namespace MultiTrackQTMovie {
                 this->_chunks = new std::vector<U64>[this->_info->size()];
                 this->_keyframes = new std::vector<bool>[this->_info->size()];
                  
+               
+                if(vps) this->_vps = vps;
                 if(sps) this->_sps = sps;
                 if(pps) this->_pps = pps;
 
@@ -112,7 +114,7 @@ namespace MultiTrackQTMovie {
             
         public:
             
-            Recorder(NSString *fileName,std::vector<TrackInfo> *info, NSData *sps = nil, NSData *pps = nil) : VideoRecorder(fileName,info,sps,pps) {
+            Recorder(NSString *fileName,std::vector<TrackInfo> *info, NSData *sps = nil, NSData *pps = nil, NSData *vps = nil) : VideoRecorder(fileName,info,sps,pps,vps) {
                 this->inialized();
             }
             
@@ -161,6 +163,9 @@ namespace MultiTrackQTMovie {
                         if(((*this->_info)[trackid].type)=="avc1") {
                             this->_frames[trackid].push_back(length);
                         }
+                        else if(((*this->_info)[trackid].type)=="hvc1") {
+                            this->_frames[trackid].push_back(length);
+                        }
                         else {
                             this->_frames[trackid].push_back(size);
                         }
@@ -186,9 +191,26 @@ namespace MultiTrackQTMovie {
                 
                 if(this->_isRunning&&!this->_isRecorded) {
                     
+                    bool avc1 = false;
+                    bool hvc1 = false;
+                    
                     for(int n=0; n<this->_info->size(); n++) {
-                        bool avc1 = (((*this->_info)[n].type)=="avc1")?true:false;
-                        if(avc1) {
+                        
+                        if((*this->_info)[n].type=="avc1") {
+                            avc1 = true;
+                        }
+                        else if((*this->_info)[n].type=="hvc1") {
+                            hvc1 = true;
+                        }
+                        
+                        if(hvc1) {
+                            if(!(this->_vps&&this->_sps&&this->_pps)) {
+                                this->_isRunning = false;
+                                this->_isRecorded = true;
+                                return;
+                            }
+                        }
+                        else if(avc1) {
                             if(!(this->_sps&&this->_pps)) {
                                 this->_isRunning = false;
                                 this->_isRecorded = true;
@@ -208,7 +230,19 @@ namespace MultiTrackQTMovie {
                         this->_mdat = nil;
                     }
                     
-                    MultiTrackQTMovie::moov *moov = new MultiTrackQTMovie::moov(this->_info,this->_frames,this->_chunks,this->_keyframes,(unsigned char *)[this->_sps bytes],[this->_sps length],(unsigned char *)[this->_pps bytes],[this->_pps length]);
+                    MultiTrackQTMovie::moov *moov = nullptr;
+                    
+                    if(hvc1) {
+                                                
+                        moov = new MultiTrackQTMovie::moov(this->_info,this->_frames,this->_chunks,this->_keyframes,(unsigned char *)[this->_sps bytes],[this->_sps length],(unsigned char *)[this->_pps bytes],[this->_pps length],(unsigned char *)[this->_vps bytes],[this->_vps length]);
+                    }
+                    else if(avc1) {
+                        moov = new MultiTrackQTMovie::moov(this->_info,this->_frames,this->_chunks,this->_keyframes,(unsigned char *)[this->_sps bytes],[this->_sps length],(unsigned char *)[this->_pps bytes],[this->_pps length],nullptr,0);
+                    }
+                    else {
+                        moov = new MultiTrackQTMovie::moov(this->_info,this->_frames,this->_chunks,this->_keyframes,nullptr,0,nullptr,0,nullptr,0);
+                    }
+                  
                     
                     [this->_handle seekToEndOfFile];
                     
