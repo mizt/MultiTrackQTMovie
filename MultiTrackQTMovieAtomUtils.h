@@ -411,7 +411,7 @@ namespace MultiTrackQTMovie {
                         for(U64 n=0; n<sps_size-4; n++) {
                             this->bin.push_back(bytes[n]);
                         }
-                        this->setU8(1); // 1
+                        this->setU8(1);
                         this->setU16(swapU32(*((unsigned int *)pps))&0xFFFF);
                         bytes = ((unsigned char *)pps)+4;
                         for(U64 n=0; n<pps_size-4; n++) {
@@ -420,7 +420,7 @@ namespace MultiTrackQTMovie {
         #else
                         this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
                         [this->bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
-                        this->setU8(1); // 1
+                        this->setU8(1);
                         this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
                         [this->bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
         #endif
@@ -430,32 +430,36 @@ namespace MultiTrackQTMovie {
                         
                         Atom hvcC = this->initAtom("hvcC");
 
-                        this->setU8(1); // configurationVersion
-                        this->setU8(1); // general_profile_space, general_tier_flag, general_profile_idc
-                        this->setU32(1610612736); // general_profile_compatibility
+                        unsigned char configurationVersion = 1;
+                        this->setU8(configurationVersion);
                         
-                        // general_constraint_indicator
-                        this->setU8(176);
+                        this->setU8(0);
+                        this->setU32(0);
+                        
+                        this->setU8(0);
                         this->setU8(0);
                         this->setU8(0);
                         this->setU8(0);
                         this->setU8(0);
                         this->setU8(0);
                         
-                        this->setU8(183); // general_level_idc
-                        this->setU16(61440); // min_spatial_segmentation_idc
-                        this->setU8(252); // parallelismType
-                        this->setU8(253); // chroma_format_idc	
-                        this->setU8(248); // bit_depth_luma_minus8
-                        this->setU8(248); // bit_depth_chroma_minus8
-                        this->setU16(0); // avgFrameRate
-                        this->setU8(11); // reserved, numTemporalLayers, temporalIdNested, lengthSizeMinusOne
+                        this->setU8(0);
+                        this->setU16(0);
+                        this->setU8(0);
+                        this->setU8(0);
+                        this->setU8(0);
+                        this->setU8(0);
+                        this->setU16(0);
                         
-                        this->setU8(3); // numOfArrays
+                        unsigned char lengthSizeMinusOne = 3;
+                        this->setU8(lengthSizeMinusOne);
+                        
+                        unsigned char numOfArrays = 3;
+                        this->setU8(numOfArrays);
                         
         #ifdef USE_VECTOR
                         
-                        this->setU8(1<<7|HEVCNALUType::VPS);
+                        this->setU8(1<<7|HEVCNaluType::VPS);
                         this->setU16(1);
                         this->setU16(swapU32(*((unsigned int *)vps))&0xFFFF);
                         unsigned char *bytes = ((unsigned char *)vps)+4;
@@ -464,7 +468,7 @@ namespace MultiTrackQTMovie {
                         }
                         
                         
-                        this->setU8(1<<7|HEVCNALUType::SPS);
+                        this->setU8(1<<7|HEVCNaluType::SPS);
                         this->setU16(1);
                         this->setU16(swapU32(*((unsigned int *)sps))&0xFFFF);
                         bytes = ((unsigned char *)sps)+4;
@@ -472,7 +476,7 @@ namespace MultiTrackQTMovie {
                             this->bin.push_back(bytes[n]);
                         }
                         
-                        this->setU8(1<<7|HEVCNALUType::PPS);
+                        this->setU8(1<<7|HEVCNaluType::PPS);
                         this->setU16(1);
                         this->setU16(swapU32(*((unsigned int *)pps))&0xFFFF);
                         bytes = ((unsigned char *)pps)+4;
