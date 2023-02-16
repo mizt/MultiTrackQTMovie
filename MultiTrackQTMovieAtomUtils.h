@@ -411,7 +411,7 @@ namespace MultiTrackQTMovie {
                         for(U64 n=0; n<sps_size-4; n++) {
                             this->bin.push_back(bytes[n]);
                         }
-                        this->setU8(1);
+                        this->setU8(1); // 1
                         this->setU16(swapU32(*((unsigned int *)pps))&0xFFFF);
                         bytes = ((unsigned char *)pps)+4;
                         for(U64 n=0; n<pps_size-4; n++) {
@@ -420,7 +420,7 @@ namespace MultiTrackQTMovie {
         #else
                         this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
                         [this->bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
-                        this->setU8(1);
+                        this->setU8(1); // 1
                         this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
                         [this->bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
         #endif
@@ -430,9 +430,7 @@ namespace MultiTrackQTMovie {
                         
                         Atom hvcC = this->initAtom("hvcC");
 
-                        unsigned char configurationVersion = 1;
-                        this->setU8(configurationVersion);
-                        
+                        this->setU8(1);
                         this->setU8(0);
                         this->setU32(0);
                         
@@ -450,12 +448,9 @@ namespace MultiTrackQTMovie {
                         this->setU8(0);
                         this->setU8(0);
                         this->setU16(0);
+                        this->setU8(3);
                         
-                        unsigned char lengthSizeMinusOne = 3;
-                        this->setU8(lengthSizeMinusOne);
-                        
-                        unsigned char numOfArrays = 3;
-                        this->setU8(numOfArrays);
+                        this->setU8(3); // numOfArrays
                         
         #ifdef USE_VECTOR
                         
