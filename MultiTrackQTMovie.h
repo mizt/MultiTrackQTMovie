@@ -10,20 +10,20 @@ namespace MultiTrackQTMovie {
         
         protected:
             
-            NSString *_fileName;
+            NSString *_path;
             
             bool _isRunning = false;
             bool _isRecorded = false;
             
             NSFileHandle *_handle;
-            std::vector<U64> *_frames;
+            std::vector<u64> *_frames;
             
-            const unsigned int MDAT_LIMIT = (1024*1024*1024)/10; // 0.1 = 100MB
-            U64 _mdat_offset = 0;
+            const unsigned int MDAT_LIMIT = (1024*1024*1024); // 1GB
+            u64 _mdat_offset = 0;
             NSMutableData *_mdat = nil;
             
-            U64 _chunk_offset = 0;
-            std::vector<U64> *_chunks;
+            u64 _chunk_offset = 0;
+            std::vector<u64> *_chunks;
         
             std::vector<bool> *_keyframes;
             
@@ -39,7 +39,7 @@ namespace MultiTrackQTMovie {
                 NSDate *date = [NSDate dateWithTimeIntervalSince1970:[timeStampString doubleValue]];
                 NSDateFormatter *format = [[NSDateFormatter alloc] init];
                 [format setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"ja_JP"]];
-                [format setDateFormat:@"yyyy_MM_dd_HH_mm_ss_SSS"];
+                [format setDateFormat:@"yyyy_MMdd_HHmm_ss_SSS"];
     #if TARGET_OS_OSX
                 NSArray *paths = NSSearchPathForDirectoriesInDomains(NSMoviesDirectory,NSUserDomainMask,YES);
     #else
@@ -54,13 +54,15 @@ namespace MultiTrackQTMovie {
             
             VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info) {
                 
-                if(fileName) this->_fileName = fileName;
-                else this->_fileName = [NSString stringWithFormat:@"%@.mov",this->filename()];
+                if(fileName) this->_path = fileName;
+                else this->_path = [NSString stringWithFormat:@"%@.mov",this->filename()];
                 this->_info = info;
-                this->_frames = new std::vector<U64>[this->_info->size()];
-                this->_chunks = new std::vector<U64>[this->_info->size()];
+                this->_frames = new std::vector<u64>[this->_info->size()];
+                this->_chunks = new std::vector<u64>[this->_info->size()];
                 this->_keyframes = new std::vector<bool>[this->_info->size()];
             }
+        
+            NSString *path() { return this->_path; }
         
             bool isVPS() { return this->_vps?true:false; }
             void setVPS(NSData *data) { this->_vps = [[NSData alloc] initWithData:data]; }
@@ -95,16 +97,16 @@ namespace MultiTrackQTMovie {
                 
         #ifdef USE_VECTOR
                 std::vector<unsigned char> *bin = ftyp->get();
-                [[[NSData alloc] initWithBytes:bin->data() length:bin->size()] writeToFile:this->_fileName options:NSDataWritingAtomic error:nil];
+                [[[NSData alloc] initWithBytes:bin->data() length:bin->size()] writeToFile:this->_path options:NSDataWritingAtomic error:nil];
                 length = bin->size();
         #else
                 NSData *bin = ftyp->get();
-                [bin writeToFile:this->_fileName options:NSDataWritingAtomic error:nil];
+                [bin writeToFile:this->_path options:NSDataWritingAtomic error:nil];
                 length = [bin length];
 
         #endif
                 
-                this->_handle = [NSFileHandle fileHandleForWritingAtPath:this->_fileName];
+                this->_handle = [NSFileHandle fileHandleForWritingAtPath:this->_path];
                 [this->_handle seekToEndOfFile];
                 
                 this->_mdat_offset = length;
@@ -129,8 +131,8 @@ namespace MultiTrackQTMovie {
                     
                     if(trackid>=0&&trackid<this->_info->size()) {
                         
-                        U64 size = length;
-                        U64 diff = 0;
+                        u64 size = length;
+                        u64 diff = 0;
                         
                         if(padding&&(length%4!=0)) {
                             diff=(((length+3)>>2)<<2)-length;
@@ -187,8 +189,9 @@ namespace MultiTrackQTMovie {
             
             void save() {
                 
+
                 if(this->_isRunning&&!this->_isRecorded) {
-                    
+                                        
                     bool avc1 = false;
                     bool hvc1 = false;
                     
@@ -231,7 +234,6 @@ namespace MultiTrackQTMovie {
                     MultiTrackQTMovie::moov *moov = nullptr;
                     
                     if(hvc1) {
-                                                
                         moov = new MultiTrackQTMovie::moov(this->_info,this->_frames,this->_chunks,this->_keyframes,(unsigned char *)[this->_sps bytes],[this->_sps length],(unsigned char *)[this->_pps bytes],[this->_pps length],(unsigned char *)[this->_vps bytes],[this->_vps length]);
                     }
                     else if(avc1) {
@@ -241,7 +243,6 @@ namespace MultiTrackQTMovie {
                         moov = new MultiTrackQTMovie::moov(this->_info,this->_frames,this->_chunks,this->_keyframes,nullptr,0,nullptr,0,nullptr,0);
                     }
                   
-
                     [this->_handle seekToEndOfFile];
                     
 #ifdef USE_VECTOR
@@ -266,5 +267,6 @@ namespace MultiTrackQTMovie {
 
 };
 
+        
         
         
