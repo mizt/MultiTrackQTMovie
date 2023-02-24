@@ -210,18 +210,18 @@ namespace MultiTrackQTMovie {
                                     unsigned char *p = moov+k+offset;
                                     unsigned short size = U16(p);
                                     p+=2;
-                                    this->_ps[2] = new unsigned char[size+4];
-                                    this->_ps[2][0] = 0;
-                                    this->_ps[2][1] = 0;
-                                    memcpy(this->_ps[2]+2,p-2,size);
-                                    p+=size;
-                                    p++;
-                                    size = U16(p);
-                                    p+=2;
                                     this->_ps[1] = new unsigned char[size+4];
                                     this->_ps[1][0] = 0;
                                     this->_ps[1][1] = 0;
                                     memcpy(this->_ps[1]+2,p-2,size);
+                                    p+=size;
+                                    p++;
+                                    size = U16(p);
+                                    p+=2;
+                                    this->_ps[0] = new unsigned char[size+4];
+                                    this->_ps[0][0] = 0;
+                                    this->_ps[0][1] = 0;
+                                    memcpy(this->_ps[0]+2,p-2,size);
                                 }
                             }
                         }
