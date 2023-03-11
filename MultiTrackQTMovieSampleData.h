@@ -4,30 +4,33 @@ namespace MultiTrackQTMovie {
         class SampleData {
             
         private:
+                
+            unsigned int _tracks = 1;
             
             unsigned long _offset = 0;
             unsigned long _length = 0;
+            unsigned int _chank = 1;
             
-            std::vector<bool> _keyframes;
-            std::vector<unsigned long> _offsets;
-            std::vector<unsigned int> _lengths;
+            std::vector<bool> *_keyframes;
+            std::vector<unsigned long> *_offsets;
+            std::vector<unsigned int> *_lengths;
+            std::vector<unsigned int> *_chunks;
             
         public:
             
-            unsigned long length() { return this->_length; }
-            unsigned long offset() { return this->_offset; };
+            std::vector<bool> *keyframes(unsigned int trackid) { return this->_keyframes+trackid; }
+            std::vector<unsigned long> *offsets(unsigned int trackid) { return this->_offsets+trackid; }
+            std::vector<unsigned int> *lengths(unsigned int trackid) { return this->_lengths+trackid; };
+            std::vector<unsigned int> *chunks(unsigned int trackid) { return this->_chunks+trackid; };
             
-            std::vector<bool> *keyframes() { return &this->_keyframes; }
-            std::vector<unsigned long> *offsets() { return &this->_offsets; }
-            std::vector<unsigned int> *lengths() { return &this->_lengths; };
-            
-            void writeData(NSFileHandle *handle, unsigned char *bytes, unsigned int length, bool keyframe) {
-                this->_offsets.push_back(this->_offset+this->_length);
-                this->_lengths.push_back(length);
+            void writeData(NSFileHandle *handle, unsigned char *bytes, unsigned int length, bool keyframe, unsigned int trackid) {
+                this->_offsets[trackid].push_back(this->_offset+this->_length);
+                this->_lengths[trackid].push_back(length);
+                this->_chunks[trackid].push_back(this->_chank++);
                 [handle writeData:[[NSData alloc] initWithBytes:bytes length:length]];
                 [handle seekToEndOfFile];
                 this->_length+=length;
-                this->_keyframes.push_back(keyframe);
+                this->_keyframes[trackid].push_back(keyframe);
             }
             
             void writeSize(NSFileHandle *handle) {
@@ -44,7 +47,15 @@ namespace MultiTrackQTMovie {
                 [handle seekToEndOfFile];
             }
             
-            SampleData(NSFileHandle *handle, unsigned long offset) {
+            SampleData(NSFileHandle *handle, unsigned long offset,unsigned int tracks) {
+
+                this->_tracks = tracks;
+
+                this->_keyframes = new std::vector<bool>[this->_tracks];
+                this->_offsets = new std::vector<unsigned long>[this->_tracks];
+                this->_lengths = new std::vector<unsigned int>[this->_tracks];
+                this->_chunks = new std::vector<unsigned int>[this->_tracks];
+                
                 this->_offset = offset;
                 [handle writeData:[[NSData alloc] initWithBytes:new unsigned char[16]{
                     0,0,0,1,
@@ -57,9 +68,12 @@ namespace MultiTrackQTMovie {
             }
             
             ~SampleData() {
-                this->_keyframes.clear();
-                this->_offsets.clear();
-                this->_lengths.clear();
+                for(int n=0; n<this->_tracks; n++) {
+                    this->_keyframes[n].clear();
+                    this->_offsets[n].clear();
+                    this->_lengths[n].clear();
+                    this->_chunks[n].clear();
+                }
             }
         };
 }

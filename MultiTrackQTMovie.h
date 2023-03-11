@@ -72,7 +72,6 @@ namespace MultiTrackQTMovie {
                 return [NSString stringWithFormat:@"%@/%@",directory,[format stringFromDate:date]];
             }
             
-            
         public:
             
             VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info) {
@@ -104,18 +103,12 @@ namespace MultiTrackQTMovie {
                 
             dispatch_source_t _timer = nullptr;
             std::vector<Buffer *> *_queue;
-            std::vector<SampleData *> _mdat;
-        
-            unsigned long _offset = 0;
-            
+            SampleData * _mdat = nullptr;
+                    
             void inialized() {
                 
                 if(this->_info->size()>=1) {
                     this->_queue = new std::vector<Buffer *>[this->_info->size()];
-                }
-                
-                for(int n=0; n<this->_info->size(); n++) {
-                    this->_mdat.push_back(nullptr);
                 }
                 
                 MultiTrackQTMovie::ftyp *ftyp = new MultiTrackQTMovie::ftyp();
@@ -135,7 +128,7 @@ namespace MultiTrackQTMovie {
                 this->_handle = [NSFileHandle fileHandleForWritingAtPath:this->_path];
                 [this->_handle seekToEndOfFile];
                 
-                this->_offset = length;
+                this->_mdat = new SampleData(this->_handle,length,this->_info->size());
             }
         
             void cleanup() {
@@ -168,16 +161,12 @@ namespace MultiTrackQTMovie {
                                 unsigned int length = this->_queue[n][k]->length();
                                 unsigned char *bytes = this->_queue[n][k]->bytes();
                                 
-                                if(this->_mdat[n]==nullptr) {
-                                    this->_mdat[n] = new SampleData(this->_handle,this->_offset);
-                                }
-                                
-                                this->_mdat[n]->writeData(this->_handle,bytes,length,keyframe);
+                                this->_mdat->writeData(this->_handle,bytes,length,keyframe,n);
                                 
                                 delete this->_queue[n][k];
                                 this->_queue[n][k] = nullptr;
                                 
-                                NSLog(@"%d",k);
+                                NSLog(@"%d (%d)",n,k);
                                 
                                 break;
                             }
@@ -201,9 +190,10 @@ namespace MultiTrackQTMovie {
                         bool avc1 = false;
                         bool hvc1 = false;
                         
+                        this->_mdat->writeSize(this->_handle);
+
                         for(int n=0; n<this->_info->size(); n++) {
                             
-                            this->_mdat[n]->writeSize(this->_handle);
                             
                             if((*this->_info)[n].type=="avc1") {
                                 avc1 = true;
