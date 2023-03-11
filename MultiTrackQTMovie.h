@@ -115,15 +115,9 @@ namespace MultiTrackQTMovie {
                 
                 unsigned long length = 0;
                 
-        #ifdef USE_VECTOR
                 std::vector<unsigned char> *bin = ftyp->get();
                 [[[NSData alloc] initWithBytes:bin->data() length:bin->size()] writeToFile:this->_path options:NSDataWritingAtomic error:nil];
                 length = bin->size();
-        #else
-                NSData *bin = ftyp->get();
-                [bin writeToFile:this->_path options:NSDataWritingAtomic error:nil];
-                length = [bin length];
-        #endif
                 
                 this->_handle = [NSFileHandle fileHandleForWritingAtPath:this->_path];
                 [this->_handle seekToEndOfFile];
@@ -165,8 +159,6 @@ namespace MultiTrackQTMovie {
                                 
                                 delete this->_queue[n][k];
                                 this->_queue[n][k] = nullptr;
-                                
-                                NSLog(@"%d (%d)",n,k);
                                 
                                 break;
                             }
@@ -232,14 +224,8 @@ namespace MultiTrackQTMovie {
                       
                         [this->_handle seekToEndOfFile];
                         
-    #ifdef USE_VECTOR
                         std::vector<unsigned char> *bin = moov->get();
                         [this->_handle writeData:[[NSData alloc] initWithBytes:bin->data() length:bin->size()]];
-
-    #else
-                        [this->_handle writeData:moov->get()];
-
-    #endif
                         delete moov;
                         
                         this->_isSaving = false;

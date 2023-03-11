@@ -1,7 +1,7 @@
 #import <vector>
 
 namespace MultiTrackQTMovie {
-        class SampleData {
+    class SampleData {
             
         private:
                 

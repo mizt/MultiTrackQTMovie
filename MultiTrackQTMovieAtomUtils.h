@@ -1,19 +1,6 @@
 #import <vector>
 #import <string>
 
-namespace AVCNaluType {
-    const unsigned char SPS = 7;
-    const unsigned char PPS = 8;
-}
-
-namespace HEVCNaluType {
-    const unsigned char VPS = 32;
-    const unsigned char SPS = 33;
-    const unsigned char PPS = 34;
-}
-
-#define USE_VECTOR
-
 // https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html
 
 namespace MultiTrackQTMovie {
@@ -23,24 +10,13 @@ namespace MultiTrackQTMovie {
         protected:
         
                 void reset() {
-            #ifdef USE_VECTOR
                     this->bin.clear();
-            #else
-                    if(this->bin) this->bin = nil;
-                    this->bin = [[NSMutableData alloc] init];
-            #endif
                 }
             
-            #ifdef USE_VECTOR
                 std::vector<unsigned char> bin;
                 unsigned int CreationTime = 3061152000;
-            #else
-                NSMutableData *bin = nil;
-                unsigned int CreationTime = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1904;
-            #endif
                 
                 void setU64(u64 value) {
-            #ifdef USE_VECTOR
                     bin.push_back((value>>56)&0xFF);
                     bin.push_back((value>>48)&0xFF);
                     bin.push_back((value>>40)&0xFF);
@@ -49,45 +25,26 @@ namespace MultiTrackQTMovie {
                     bin.push_back((value>>16)&0xFF);
                     bin.push_back((value>>8)&0xFF);
                     bin.push_back((value)&0xFF);
-            #else
-                    [this->bin appendBytes:new unsigned long[1]{swapU64(value)} length:8];
-            #endif
                 }
         
                 void setU32(unsigned int value) {
-            #ifdef USE_VECTOR
                     bin.push_back((value>>24)&0xFF);
                     bin.push_back((value>>16)&0xFF);
                     bin.push_back((value>>8)&0xFF);
                     bin.push_back((value)&0xFF);
-            #else
-                    [this->bin appendBytes:new unsigned int[1]{swapU32(value)} length:4];
-            #endif
                 }
                 
                 void setU16(unsigned short value) {
-            #ifdef USE_VECTOR
                     bin.push_back((value>>8)&0xFF);
                     bin.push_back((value)&0xFF);
-            #else
-                    [this->bin appendBytes:new unsigned short[1]{swapU16(value)} length:2];
-            #endif
                 }
                 
                 void setU8(unsigned char value) {
-            #ifdef USE_VECTOR
                     bin.push_back(value);
-            #else
-                    [bin appendBytes:new unsigned char[1]{value} length:1];
-            #endif
                 }
         
                 void setZero(u64 length) {
-            #ifdef USE_VECTOR
                     for(u64 n=0; n<length; n++) bin.push_back(0);
-            #else
-                    for(u64 n=0; n<length; n++) [this->bin appendBytes:new unsigned char[1]{0} length:1];
-            #endif
                 }
         };
 }
@@ -102,23 +59,12 @@ namespace MultiTrackQTMovie {
     class ftyp : public AtomUtils {
         
         public:
-        
-    #ifdef USE_VECTOR
-        
+                
             std::vector<unsigned char> *get() {
                 return &this->bin;
             }
 
             ftyp() {
-    #else
-
-            NSMutableData *get() {
-                return this->bin;
-            }
-            
-            ftyp() {
-    #endif
-                
                 this->reset();
                 this->setU32(0x00000014); // 20
                 this->setU32(0x66747970); // 'ftyp'
@@ -133,9 +79,7 @@ namespace MultiTrackQTMovie {
             ~ftyp() {
                 this->reset();
             }
-            
     };
-
 }
 
 namespace MultiTrackQTMovie {
@@ -151,14 +95,8 @@ namespace MultiTrackQTMovie {
             unsigned short Language = 21956;
             
             Atom initAtom(std::string str, unsigned int size=0, bool dump=false) {
-                
                 //assert(str.length()<=4);
-                
-        #ifdef USE_VECTOR
                 u64 pos = this->bin.size();
-        #else
-                u64 pos = (unsigned int)[bin length];
-        #endif
                 this->setU32(size);
                 this->setString(str);
                 //if(dump) NSLog(@"%s,%lu",str.c_str(),pos);
@@ -166,15 +104,11 @@ namespace MultiTrackQTMovie {
             }
             
             void setAtomSize(u64 pos) {
-        #ifdef USE_VECTOR
                 unsigned int size = (unsigned int)(this->bin.size()-pos);
                 this->bin[pos+0] = (size>>24)&0xFF;
                 this->bin[pos+1] = (size>>16)&0xFF;
                 this->bin[pos+2] = (size>>8)&0xFF;
                 this->bin[pos+3] = size&0xFF;
-        #else
-                *(unsigned int *)(((unsigned char *)[this->bin bytes])+pos) = swapU32(((unsigned int)this->bin.length)-pos);
-        #endif
             }
             
             void setString(std::string str, unsigned int length=4) {
@@ -220,22 +154,13 @@ namespace MultiTrackQTMovie {
             }
             
         public:
-        
-        #ifdef USE_VECTOR
-            
+                    
             std::vector<unsigned char> *get() {
                 return &this->bin;
             }
         
             moov(std::vector<TrackInfo> *info, SampleData *mdat, unsigned char *sps, u64 sps_size, unsigned char *pps, u64 pps_size, unsigned char *vps=nullptr, u64 vps_size=0) {
-        #else
-        
-            NSMutableData *get() {
-                return this->bin;
-            }
                 
-            moov(std::vector<TrackInfo> *info, SampleData *mdat, NSData *vps, NSData *sps, NSData *pps) {
-        #endif
                 this->reset();
                 
                 Atom moov = this->initAtom("moov");
@@ -403,9 +328,7 @@ namespace MultiTrackQTMovie {
                         this->setU8(40);
                         this->setU8(0xFF); // 3
                         this->setU8(0xE1); // 1
-                        
-        #ifdef USE_VECTOR
-                        
+                                                
                         this->setU16(swapU32(*((unsigned int *)sps))&0xFFFF);
                         unsigned char *bytes = ((unsigned char *)sps)+4;
                         for(u64 n=0; n<sps_size-4; n++) {
@@ -417,13 +340,6 @@ namespace MultiTrackQTMovie {
                         for(u64 n=0; n<pps_size-4; n++) {
                             this->bin.push_back(bytes[n]);
                         }
-        #else
-                        this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
-                        [this->bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
-                        this->setU8(1); // 1
-                        this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
-                        [this->bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
-        #endif
                         this->setAtomSize(avcC.second);
                     }
                     else if(hvc1&&vps&&sps&&pps) {
@@ -451,8 +367,6 @@ namespace MultiTrackQTMovie {
                         
                         this->setU8(3); // numOfArrays
                         
-        #ifdef USE_VECTOR
-                        
                         this->setU8(1<<7|HEVCNaluType::VPS);
                         this->setU16(1);
                         this->setU16(swapU32(*((unsigned int *)vps))&0xFFFF);
@@ -476,21 +390,6 @@ namespace MultiTrackQTMovie {
                         for(u64 n=0; n<pps_size-4; n++) {
                             this->bin.push_back(bytes[n]);
                         }
-                        
-        #else
-                        this->setU8(1<<7|HEVCNALUType::VPS);
-                        this->setU16(1);
-                        this->setU16(swapU32(*((unsigned int *)[vps bytes]))&0xFFFF);
-                        [this->bin appendBytes:((unsigned char *)[vps bytes])+4 length:[vps length]-4];
-                        this->setU8(1<<7|HEVCNALUType::SPS);
-                        this->setU16(1);
-                        this->setU16(swapU32(*((unsigned int *)[sps bytes]))&0xFFFF);
-                        [this->bin appendBytes:((unsigned char *)[sps bytes])+4 length:[sps length]-4];
-                        this->setU8(1<<7|HEVCNALUType::PPS);
-                        this->setU16(1);
-                        this->setU16(swapU32(*((unsigned int *)[pps bytes]))&0xFFFF);
-                        [this->bin appendBytes:((unsigned char *)[pps bytes])+4 length:[pps length]-4];
-        #endif
                         
                         this->setAtomSize(hvcC.second);
                     }

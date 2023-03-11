@@ -91,3 +91,14 @@ namespace MultiTrackQTMovie {
         return swapU16(toU16(p));
     }
 }
+
+namespace AVCNaluType {
+    const unsigned char SPS = 7;
+    const unsigned char PPS = 8;
+}
+
+namespace HEVCNaluType {
+    const unsigned char VPS = 32;
+    const unsigned char SPS = 33;
+    const unsigned char PPS = 34;
+}
