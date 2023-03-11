@@ -23,20 +23,8 @@ namespace MultiTrackQTMovie {
     
 #else 
         
-            FILE *_fp;
-            
-            NSData *cut(off_t offset, size_t bytes) {
-                if(this->_fp) {
-                    unsigned char *data = new unsigned char[bytes];
-                    if(fseeko(this->_fp,offset,SEEK_SET)!=-1) {
-                        fread(data,1,bytes,this->_fp);
-                        NSData *buffer = [NSData dataWithBytes:data length:bytes];
-                        delete[] data;
-                        return buffer;
-                    }
-                }
-                return nil;
-            }
+            NSFileHandle *_handle;
+        
 #endif
 
             void reset() {
@@ -132,7 +120,7 @@ namespace MultiTrackQTMovie {
                 return str;
             }
         
-            void parseTrack(unsigned char *moov, int len) {
+            void parseTrack(unsigned char *moov,u64 len) {
                 
                 std::vector<unsigned int> track;
                 
@@ -188,7 +176,8 @@ namespace MultiTrackQTMovie {
                                     unsigned char num = *p++;
                                     if(num==3) {
                                         while(num--) {
-                                            unsigned char type = (*p++)&0x7F;
+                                            //unsigned char type = (*p++)&0x7F;
+                                            p++;
                                             p+=2;
                                             unsigned short size = U16(p);
                                             p+=2;
@@ -213,7 +202,7 @@ namespace MultiTrackQTMovie {
                                     this->_ps[1] = new unsigned char[size+4];
                                     this->_ps[1][0] = 0;
                                     this->_ps[1][1] = 0;
-                                    memcpy(this->_ps[1]+2,p-2,size);
+                                    memcpy(this->_ps[1]+2,p-2,size+2);
                                     p+=size;
                                     p++;
                                     size = U16(p);
@@ -221,7 +210,7 @@ namespace MultiTrackQTMovie {
                                     this->_ps[0] = new unsigned char[size+4];
                                     this->_ps[0][0] = 0;
                                     this->_ps[0][1] = 0;
-                                    memcpy(this->_ps[0]+2,p-2,size);
+                                    memcpy(this->_ps[0]+2,p-2,size+2);
                                 }
                             }
                         }
@@ -242,9 +231,24 @@ namespace MultiTrackQTMovie {
                             unsigned int totalFrames = 0;
                             std::pair<u64,unsigned int> *frames = nullptr;
                             
-                            if(info->type=="hvc1") {
+                            if(info->type=="hvc1"||info->type=="avc1") {
                                 
-                                unsigned int seek = 36;
+                                unsigned long offset = 0;
+                                
+                                for(int k=begin; k<end-((4*2)+4); k++) {
+                                    
+                                    if(U32(moov+k)==atom("stco")) {
+                                        k+=(4*3);
+                                        offset = U32(moov+k);
+                                        break;
+                                    }
+                                    else if(U32(moov+k)==atom("co64")) {
+                                        k+=(4*3);
+                                        offset = U64(moov+k);
+                                        break;
+                                    }
+                                }
+                                
                                 
                                 for(int k=begin; k<end-((4*3)+4); k++) {
                                     if(U32(moov+k)==atom("stsz")) {
@@ -255,8 +259,8 @@ namespace MultiTrackQTMovie {
                                         for(int f=0; f<totalFrames; f++) {
                                             k+=4; // 32
                                             unsigned int size = U32(moov+k);
-                                            frames[f] = std::make_pair(seek,size);
-                                            seek+=size;
+                                            frames[f] = std::make_pair(offset,size);
+                                            offset+=size;
                                         }
                                         break;
                                     }
@@ -280,6 +284,7 @@ namespace MultiTrackQTMovie {
                                 }
                                                                 
                                 for(int k=begin; k<end-((4*2)+4); k++) {
+                                    
                                     if(U32(moov+k)==atom("stco")) {
                                         k+=(4*2);
                                         if(totalFrames==U32(moov+k)) {
@@ -361,13 +366,18 @@ namespace MultiTrackQTMovie {
                             }
                             else if(U32(seek)==this->atom("moov")) {
                                 unsigned char *moov = seek+4;
-                                this->parseTrack(moov,(U32(moov-8)-4)-3);
+                                this->parseTrack(moov,U32(moov-8)-8);
                                 break;
                             }
                             else {
                                 break;
                             }
                         }
+                    }
+                    else if(U32(seek)==this->atom("mdat")) {
+                        unsigned char *moov = seek+4;
+                        this->parseTrack(moov,U32(moov-8)-8);
+                        break;
                     }
                 }
 
@@ -385,89 +395,77 @@ namespace MultiTrackQTMovie {
             
 #else
         
-            u64 size() {
-                fpos_t size = 0;
-                fseeko(this->_fp,0,SEEK_END);
-                fgetpos(this->_fp,&size);
-                return size;
-            }
-            
             NSData *get(u64 n,unsigned int tracks) {
                 if(n<this->_totalFrames[tracks]) {
-                    return this->cut(this->_frames[tracks][n].first,this->_frames[tracks][n].second);
+                    [this->_handle seekToOffset:this->_frames[tracks][n].first error:nil];
+                    return [this->_handle readDataUpToLength:this->_frames[tracks][n].second error:nil];
                 }
                 return nil;
             }
-        
-            void parse(FILE *fp) {
-                
-                this->reset();
-                
-                this->_fp = fp;
-                
-                if(fp!=NULL){
+            
+            Parser(NSString *path) {
                     
-                    unsigned int buffer;
-                    fseeko(fp,4*7,SEEK_SET);
-                    fread(&buffer,sizeof(unsigned int),1,fp); // 4*7
-                    u64 offset = swapU32(buffer);
-                    fread(&buffer,sizeof(unsigned int),1,fp); // 4*8
+                if([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+                    
+                    this->_handle = [NSFileHandle fileHandleForReadingAtPath:path];
+                                
+                    unsigned long offset = 0;
+                    
+                    [this->_handle seekToOffset:0 error:nil];
+                    NSData *data = [this->_handle readDataUpToLength:4 error:nil];
+                    offset+=U32((unsigned char *)(data.bytes));
+                    
+                    [this->_handle seekToOffset:offset error:nil];
+                    data = [this->_handle readDataUpToLength:4 error:nil];
+                    offset+=U32((unsigned char *)(data.bytes));
+                    offset+=4;
+                    
+                    [this->_handle seekToOffset:offset error:nil];
+                    data = [this->_handle readDataUpToLength:4 error:nil];
+                    
+                    unsigned long mdat = 0;
+                    
+                    if(U32((unsigned char *)(data.bytes))==0x6D646174) { // mdat
                         
-                    if(swapU32(buffer)==this->atom("mdat")) {
-                        
-                        fseeko(fp,(4*8)+offset-4,SEEK_SET);
-                        fread(&buffer,sizeof(unsigned int),1,fp);
-                        int len = swapU32(buffer);
-                        fread(&buffer,sizeof(unsigned int),1,fp);
-                        
-                        while(true) {
-                            
-                            if(swapU32(buffer)==this->atom("mdat")) {
-                                
-                                fseeko(fp,(4*8)+offset+len-4,SEEK_SET);
-                                fread(&buffer,sizeof(unsigned int),1,fp);
-                                len+=swapU32(buffer);
-                                fread(&buffer,sizeof(unsigned int),1,fp);
-                                
-                            }
-                            else if(swapU32(buffer)==this->atom("moov")) {
-                                
-                                unsigned char *moov = new unsigned char[len-4];
-                                fread(moov,sizeof(unsigned char),len-4,fp);
-                                
-                                this->parseTrack(moov,(len-4)-3);
-                                
-                                delete[] moov;
-                                
-                                break;
-                                
-                            }
-                            else {
-                                
-                                break;
-                                
-                            }
+                        [this->_handle seekToOffset:offset-4 error:nil];
+                        data = [this->_handle readDataUpToLength:4 error:nil];
+                        if(U32((unsigned char *)(data.bytes))==1) {
+                            [this->_handle seekToOffset:offset+4 error:nil];
+                            data = [this->_handle readDataUpToLength:8 error:nil];
+                            offset+=U64((unsigned char *)(data.bytes));
                         }
+                        else {
+                            offset+=U32((unsigned char *)(data.bytes));
+                        }
+                        
+                        [this->_handle seekToOffset:offset error:nil];
+                        data = [this->_handle readDataUpToLength:4 error:nil];
+                        
+                        if(U32((unsigned char *)(data.bytes))==0x6D6F6F76) { // moov
+                            
+                            [this->_handle seekToOffset:offset-4 error:nil];
+                            data = [this->_handle readDataUpToLength:4 error:nil];
+                            unsigned long length = U32((unsigned char *)(data.bytes));
+                            
+                            [this->_handle seekToOffset:offset+4 error:nil];
+                            this->parseTrack((unsigned char *)[this->_handle readDataUpToLength:length-8 error:nil].bytes,length-8);
+                            
+                        }
+                    }
+                    else if(U32((unsigned char *)(data.bytes))==0x6D6F6F76) { // moov
+                        
+                        [this->_handle seekToOffset:offset-4 error:nil];
+                        data = [this->_handle readDataUpToLength:4 error:nil];
+                        unsigned long length = U32((unsigned char *)(data.bytes));
+                        
+                        [this->_handle seekToOffset:offset+4 error:nil];
+                        this->parseTrack((unsigned char *)[this->_handle readDataUpToLength:length-8 error:nil].bytes,length-8);
                     }
                 }
             }
         
-            Parser(FILE *fp) {
-                this->parse(fp);
-            }
-            
-            Parser(NSString *path) {
-                FILE *fp = fopen([path UTF8String],"rb");
-                this->parse(fp);
-            }
-        
             ~Parser() {
-                
-                if(this->_fp) {
-                    fclose(this->_fp);
-                }
-                this->_fp = NULL;
-                this->clear();
+                if(this->_handle) [this->_handle closeFile];
             }
         
 #endif
@@ -476,5 +474,6 @@ namespace MultiTrackQTMovie {
 
 };
 
+                                
                                 
                                 

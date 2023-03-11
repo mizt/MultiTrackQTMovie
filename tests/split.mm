@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#import "../MultiTrackQTMovie.h"
+#import "../MultiTrackQTMovieParser.h"
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {

@@ -1,9 +1,9 @@
 #import <Foundation/Foundation.h>
-#import "../MultiTrackQTMovie.h"
+#import "../MultiTrackQTMovieParser.h"
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
-        MultiTrackQTMovie::Parser *parser = new MultiTrackQTMovie::Parser(@"24fps.mov");
+        MultiTrackQTMovie::Parser *parser = new MultiTrackQTMovie::Parser(@"./test.mov");
         NSLog(@"tracks = %d",parser->tracks());
         
         for(int n=0; n<parser->tracks(); n++) {
