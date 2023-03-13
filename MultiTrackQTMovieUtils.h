@@ -1,3 +1,5 @@
+#import <vector>
+
 #ifdef EMSCRIPTEN
     typedef unsigned long long u64;
     typedef long long s64;
@@ -101,4 +103,55 @@ namespace HEVCNaluType {
     const unsigned char VPS = 32;
     const unsigned char SPS = 33;
     const unsigned char PPS = 34;
+}
+
+namespace MultiTrackQTMovie {
+    
+    class AtomUtils {
+        
+    protected:
+        
+        void reset() {
+            this->bin.clear();
+        }
+        
+        std::vector<unsigned char> bin;
+        unsigned int CreationTime = 3061152000;
+        
+        void setU64(u64 value) {
+            bin.push_back((value>>56)&0xFF);
+            bin.push_back((value>>48)&0xFF);
+            bin.push_back((value>>40)&0xFF);
+            bin.push_back((value>>32)&0xFF);
+            bin.push_back((value>>24)&0xFF);
+            bin.push_back((value>>16)&0xFF);
+            bin.push_back((value>>8)&0xFF);
+            bin.push_back((value)&0xFF);
+        }
+        
+        void setU32(unsigned int value) {
+            bin.push_back((value>>24)&0xFF);
+            bin.push_back((value>>16)&0xFF);
+            bin.push_back((value>>8)&0xFF);
+            bin.push_back((value)&0xFF);
+        }
+        
+        void setU16(unsigned short value) {
+            bin.push_back((value>>8)&0xFF);
+            bin.push_back((value)&0xFF);
+        }
+        
+        void setU8(unsigned char value) {
+            bin.push_back(value);
+        }
+        
+        void setZero(u64 length) {
+            for(u64 n=0; n<length; n++) bin.push_back(0);
+        }
+    };
+}
+
+namespace MultiTrackQTMovie {
+    
+    typedef std::pair<std::string,u64> Atom;
 }
