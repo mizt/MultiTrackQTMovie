@@ -224,7 +224,8 @@ namespace MultiTrackQTMovie {
                                     memcpy(this->_ps[0]+2,p-2,size+2);
 #ifndef EMSCRIPTEN 
                                     
-                                    this->_PS[num] =  [[NSData alloc] initWithBytes:this->_ps[num] length:(size+4)];
+                                    this->_PS[0] =  [[NSData alloc] initWithBytes:this->_ps[0] length:(size+4)];
+                                    this->_PS[1] =  [[NSData alloc] initWithBytes:this->_ps[1] length:(size+4)];
 #endif
                                 }
                             }
