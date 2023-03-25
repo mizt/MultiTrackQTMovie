@@ -117,7 +117,7 @@ namespace MultiTrackQTMovie {
         
     private:
         
-        const bool is64 = false;
+        const bool is64 = true;
         const int Transfer = 1;
         unsigned int ModificationTime = CreationTime;
         unsigned int TimeScale = 30000;
@@ -734,8 +734,14 @@ namespace MultiTrackQTMovie {
                             
                             if(hvc1) {
                                 if(!(this->_vps&&this->_sps&&this->_pps)) {
+                                    
                                     this->_isRunning = false;
                                     this->_isSaving = true;
+                                    if(!this->_vps) NSLog(@"vps does not exist.");
+                                    if(!this->_sps) NSLog(@"sps does not exist.");
+                                    if(!this->_pps) NSLog(@"pps does not exist.");
+                                    this->cleanup();
+                                    EventEmitter::emit(MultiTrackQTMovie::Event::SAVE_COMPLETE);
                                     return;
                                 }
                             }
@@ -743,6 +749,10 @@ namespace MultiTrackQTMovie {
                                 if(!(this->_sps&&this->_pps)) {
                                     this->_isRunning = false;
                                     this->_isSaving = true;
+                                    if(!this->_sps) NSLog(@"sps does not exist.");
+                                    if(!this->_pps) NSLog(@"pps does not exist.");
+                                    this->cleanup();
+                                    EventEmitter::emit(MultiTrackQTMovie::Event::SAVE_COMPLETE);
                                     return;
                                 }
                             }
