@@ -24,6 +24,8 @@ namespace MultiTrackQTMovie {
 #else 
         
             NSFileHandle *_handle;
+            NSData *_PS[3] = {nil,nil,nil};
+
         
 #endif
 
@@ -50,6 +52,10 @@ namespace MultiTrackQTMovie {
                 this->_ps[2] = nullptr;
                 this->_ps[1] = nullptr;
                 this->_ps[0] = nullptr;
+                
+                this->_PS[2] = nil;
+                this->_PS[1] = nil;
+                this->_PS[0] = nil;
             }
         
         public:
@@ -185,6 +191,12 @@ namespace MultiTrackQTMovie {
                                             this->_ps[num][0] = 0;
                                             this->_ps[num][1] = 0;
                                             memcpy(this->_ps[num]+2,p-2,size+2);
+                                            
+#ifndef EMSCRIPTEN 
+                                            
+                                            this->_PS[num] =  [[NSData alloc] initWithBytes:this->_ps[num] length:(size+4)];
+#endif
+                                            
                                             if(num) p+=size;
                                         }
                                     }
@@ -326,6 +338,13 @@ namespace MultiTrackQTMovie {
             unsigned char *vps() { return this->_ps[2]; };
             unsigned char *sps() { return this->_ps[1]; };
             unsigned char *pps() { return this->_ps[0]; };
+
+#ifndef EMSCRIPTEN 
+
+            NSData *VPS() { return this->_PS[2]; };
+            NSData *SPS() { return this->_PS[1]; };
+            NSData *PPS() { return this->_PS[0]; };
+#endif
 
 #ifdef EMSCRIPTEN 
         
