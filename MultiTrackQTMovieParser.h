@@ -126,7 +126,7 @@ namespace MultiTrackQTMovie {
                 return str;
             }
         
-            void parseTrack(unsigned char *moov,u64 len) {
+            void parseTrack(unsigned char *moov, u64 len) {
                 
                 std::vector<unsigned int> track;
                 
@@ -247,81 +247,43 @@ namespace MultiTrackQTMovie {
                             unsigned int totalFrames = 0;
                             std::pair<u64,unsigned int> *frames = nullptr;
                             
-                            if(info->type=="hvc1"||info->type=="avc1") {
-                                
-                                unsigned long offset = 0;
-                                
-                                for(int k=begin; k<end-((4*2)+4); k++) {
-                                    
-                                    if(U32(moov+k)==atom("stco")) {
-                                        k+=(4*3);
-                                        offset = U32(moov+k);
-                                        break;
+                            for(int k=begin; k<end-((4*3)+4); k++) {
+                                if(U32(moov+k)==atom("stsz")) {
+                                    k+=(4*3);
+                                    totalFrames = U32(moov+k);
+                                    if(frames) delete[] frames;
+                                    frames = new std::pair<u64,unsigned int>[totalFrames];
+                                    for(int f=0; f<totalFrames; f++) {
+                                        k+=4; // 32
+                                        unsigned int size = U32(moov+k);
+                                        frames[f] = std::make_pair(0,size);
                                     }
-                                    else if(U32(moov+k)==atom("co64")) {
-                                        k+=(4*3);
-                                        offset = U64(moov+k);
-                                        break;
-                                    }
-                                }
-                                
-                                
-                                for(int k=begin; k<end-((4*3)+4); k++) {
-                                    if(U32(moov+k)==atom("stsz")) {
-                                        k+=(4*3);
-                                        totalFrames = U32(moov+k);
-                                        if(frames) delete[] frames;
-                                        frames = new std::pair<u64,unsigned int>[totalFrames];
-                                        for(int f=0; f<totalFrames; f++) {
-                                            k+=4; // 32
-                                            unsigned int size = U32(moov+k);
-                                            frames[f] = std::make_pair(offset,size);
-                                            offset+=size;
-                                        }
-                                        break;
-                                    }
+                                    break;
                                 }
                             }
-                            else {
+                                                            
+                            for(int k=begin; k<end-((4*2)+4); k++) {
                                 
-                                for(int k=begin; k<end-((4*3)+4); k++) {
-                                    if(U32(moov+k)==atom("stsz")) {
-                                        k+=(4*3);
-                                        totalFrames = U32(moov+k);
-                                        if(frames) delete[] frames;
-                                        frames = new std::pair<u64,unsigned int>[totalFrames];
+                                if(U32(moov+k)==atom("stco")) {
+                                    k+=(4*2);
+                                    if(totalFrames==U32(moov+k)) {
+                                        k+=4;
                                         for(int f=0; f<totalFrames; f++) {
+                                            frames[f].first = U32(moov+k);
                                             k+=4; // 32
-                                            unsigned int size = U32(moov+k);
-                                            frames[f] = std::make_pair(0,size);
                                         }
                                         break;
                                     }
                                 }
-                                                                
-                                for(int k=begin; k<end-((4*2)+4); k++) {
-                                    
-                                    if(U32(moov+k)==atom("stco")) {
-                                        k+=(4*2);
-                                        if(totalFrames==U32(moov+k)) {
-                                            k+=4;
-                                            for(int f=0; f<totalFrames; f++) {
-                                                frames[f].first = U32(moov+k);
-                                                k+=4; // 32
-                                            }
-                                            break;
+                                else if(U32(moov+k)==atom("co64")) {
+                                    k+=(4*2);
+                                    if(totalFrames==U32(moov+k)) {
+                                        k+=4;
+                                        for(int f=0; f<totalFrames; f++) {
+                                            frames[f].first = U64(moov+k);
+                                            k+=8; // 64
                                         }
-                                    }
-                                    else if(U32(moov+k)==atom("co64")) {
-                                        k+=(4*2);
-                                        if(totalFrames==U32(moov+k)) {
-                                            k+=4;
-                                            for(int f=0; f<totalFrames; f++) {
-                                                frames[f].first = U64(moov+k);
-                                                k+=8; // 64
-                                            }
-                                            break;
-                                        }
+                                        break;
                                     }
                                 }
                             }
@@ -418,8 +380,9 @@ namespace MultiTrackQTMovie {
             
 #else
         
-            NSData *get(u64 n,unsigned int tracks) {
+            NSData *get(u64 n, unsigned int tracks) {
                 if(n<this->_totalFrames[tracks]) {
+                    NSLog(@"%d",this->_frames[tracks][n].first);
                     [this->_handle seekToOffset:this->_frames[tracks][n].first error:nil];
                     return [this->_handle readDataUpToLength:this->_frames[tracks][n].second error:nil];
                 }
