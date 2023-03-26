@@ -385,7 +385,7 @@ namespace MultiTrackQTMovie {
                     this->setU8(0);
                     this->setU32(0);
                     
-                    this->setU8(6.1*30); // general_level_idc [1,2,2.1,3,3.1,4,4.1,5,5.1,5.2,6,6.1,6.2]*30.0
+                    this->setU8(5*30); // general_level_idc [1,2,2.1,3,3.1,4,4.1,5,5.1,5.2,6,6.1,6.2]*30.0
                     this->setU16(0xF000); // min_spatial_segmentation_idc
                     this->setU8(0xFC); // parallelismType
                     this->setU8(0xFD); // chroma_format_idc (4:2:0)
