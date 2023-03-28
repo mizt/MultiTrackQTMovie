@@ -16,6 +16,8 @@ namespace MultiTrackQTMovie {
             
             unsigned char *_ps[3] = {nullptr,nullptr,nullptr};
             
+            std::vector<unsigned int> _traks;
+            
 #ifdef EMSCRIPTEN
     
             unsigned char *_bytes;
@@ -131,16 +133,19 @@ namespace MultiTrackQTMovie {
                 std::vector<unsigned int> track;
                 
                 for(int k=0; k<len; k++) {
-                    if(U32(moov+k)==atom("trak")) {
-                        track.push_back(k);
+                    for(int n=0; n<this->_traks.size(); n++) {
+                        if(U32(moov+k)==this->_traks[n]) {
+                            track.push_back(k);
+                        }
                     }
                 }
                 
                 this->_tracks = (unsigned int)track.size();
                 
                 unsigned int TimeScale = 0;
+                
                 for(int k=0; k<len-(4*4); k++) {
-                    if(U32(moov+k)==atom("mvhd")) {
+                    if(U32(moov+k)==this->atom("mvhd")) {
                         TimeScale = U32(moov+k+(4*4));
                         break;
                     }
@@ -388,7 +393,12 @@ namespace MultiTrackQTMovie {
                 return nil;
             }
             
-            Parser(NSString *path) {
+            Parser(NSString *path, std::vector<std::string> traks = {}) {
+                
+                this->_traks.push_back(this->atom("trak"));
+                for(int n=0; n<traks.size(); n++) {
+                    this->_traks.push_back(this->atom(traks[n]));
+                }
                     
                 if([[NSFileManager defaultManager] fileExistsAtPath:path]) {
                     
