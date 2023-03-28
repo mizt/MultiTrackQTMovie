@@ -92,9 +92,9 @@ namespace MultiTrackQTMovie {
                 return 0;
             };
             
-            std::string type(unsigned int trackid) {
+            std::string codec(unsigned int trackid) {
                 if(trackid<this->_info.size()) {
-                    return (*this->_info[trackid]).type;
+                    return (*this->_info[trackid]).codec;
                 }
                 return "";
             };
@@ -164,7 +164,7 @@ namespace MultiTrackQTMovie {
                     for(int k=begin; k<end-info_offset[3]; k++) {
                         if(U32(moov+k)==this->atom("stsd")) {
                             info = new TrackInfo;
-                            info->type = atom(U32(moov+k+info_offset[0]));
+                            info->codec = atom(U32(moov+k+info_offset[0]));
                             info->width  = U16(moov+k+info_offset[1]);
                             info->height = U16(moov+k+info_offset[2]);
                             info->depth  = U16(moov+k+info_offset[3]);
@@ -174,7 +174,7 @@ namespace MultiTrackQTMovie {
                     
                     if(info) {
                         
-                        if(info->type=="hvc1") {
+                        if(info->codec=="hvc1") {
                             int offset = 4+1+1+4+6+1+2+1+1+1+1+2+1;
                             for(int k=begin; k<end-4-offset; k++) {
                                 if(U32(moov+k)==atom("hvcC")) {
@@ -203,7 +203,7 @@ namespace MultiTrackQTMovie {
                                 }
                             }
                         }
-                        else if(info->type=="avc1") {
+                        else if(info->codec=="avc1") {
                             int offset = 6;
                             for(int k=begin; k<end-4-offset; k++) {
                                 if(U32(moov+k)==atom("avcC")) {
@@ -382,7 +382,6 @@ namespace MultiTrackQTMovie {
         
             NSData *get(u64 n, unsigned int tracks) {
                 if(n<this->_totalFrames[tracks]) {
-                    NSLog(@"%d",this->_frames[tracks][n].first);
                     [this->_handle seekToOffset:this->_frames[tracks][n].first error:nil];
                     return [this->_handle readDataUpToLength:this->_frames[tracks][n].second error:nil];
                 }

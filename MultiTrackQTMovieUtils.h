@@ -10,12 +10,13 @@
 
 namespace MultiTrackQTMovie {
 
-    typedef struct {
-        unsigned short width;
-        unsigned short height;
-        unsigned short depth;
-        double fps;
-        std::string type;
+    typedef struct _TrackInfo {
+        unsigned short width = 1920;
+        unsigned short height = 1080;
+        unsigned short depth = 24.0;
+        double fps = 30.0;
+        std::string codec = "hvc1";
+        std::string trak = "trak";
     } TrackInfo;
 
 #ifdef EMSCRIPTEN
