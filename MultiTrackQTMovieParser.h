@@ -13,24 +13,17 @@ namespace MultiTrackQTMovie {
             std::vector<TrackInfo *> _info;
             std::vector<unsigned int> _totalFrames;
             std::vector<std::pair<u64,unsigned int> *> _frames;
-            
-            
             std::vector<std::vector<unsigned char *>> _ps;
-            //unsigned char *_ps[3] = {nullptr,nullptr,nullptr};
-            
             std::vector<unsigned int> _traks;
             
 #ifdef EMSCRIPTEN
     
             unsigned char *_bytes;
             u64 _length;
-    
 #else 
         
             NSFileHandle *_handle;
-            std::vector<std::vector<NSData *>> _PS; //[3] = {nil,nil,nil};
-
-        
+            std::vector<std::vector<NSData *>> _PS;
 #endif
 
             void reset() {
