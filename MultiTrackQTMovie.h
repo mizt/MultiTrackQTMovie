@@ -4,6 +4,10 @@
 #import "MultiTrackQTMovieEvent.h"
 #import "MultiTrackQTMovieUtils.h"
 
+#ifdef USE_JPEG_ENCODE
+    #import "turbojpeg.h"
+#endif
+
 namespace MultiTrackQTMovie {
     
     class SampleData {
@@ -550,24 +554,36 @@ namespace MultiTrackQTMovie {
         private:
             
             bool _keyframe = false;
+        
             unsigned char *_bytes = nullptr;
             unsigned int _length = 0;
         
+            unsigned int _size = 0;
+        
         public:
         
-            Buffer(unsigned char *bytes, unsigned int length, bool keyframe) {
-                this->_bytes = new unsigned char[length];
+            void replace(unsigned char *bytes, unsigned int length, bool keyframe) {
                 this->_keyframe = keyframe;
                 this->_length = length;
                 memcpy(this->_bytes,bytes,this->_length);
             }
         
+            Buffer(unsigned char *bytes, unsigned int length, bool keyframe) {
+                this->_size = length;
+                this->_bytes = new unsigned char[this->_size];
+                this->replace(bytes,length,keyframe);
+            }
+        
+            bool isOverwrite(unsigned int length) {
+                return (this->_length==0&&length<=this->_size)?true:false;
+            }
+        
             bool keyframe() { return this->_keyframe; }
             unsigned int length() { return this->_length; }
             unsigned char *bytes() { return this->_bytes; }
-        
+            void clear() { this->_length = 0; }
+            
             ~Buffer() {
-                
                 if(this->_bytes) {
                     delete[] this->_bytes;
                     this->_bytes = nullptr;
@@ -593,20 +609,14 @@ namespace MultiTrackQTMovie {
             NSData *_sps = nil;
             NSData *_pps = nil;
         
-            NSString *filename() {
+            NSString *filePath(NSString *directory, NSString *extension) {
                 long unixtime = (CFAbsoluteTimeGetCurrent()+kCFAbsoluteTimeIntervalSince1970)*1000;
                 NSString *timeStampString = [NSString stringWithFormat:@"%f",(unixtime/1000.0)];
                 NSDate *date = [NSDate dateWithTimeIntervalSince1970:[timeStampString doubleValue]];
                 NSDateFormatter *format = [[NSDateFormatter alloc] init];
                 [format setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"ja_JP"]];
-                [format setDateFormat:@"yyyy_MMdd_HHmm_ss_SSS"];
-    #if TARGET_OS_OSX
-                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSMoviesDirectory,NSUserDomainMask,YES);
-    #else
-                NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES);
-    #endif
-                NSString *directory = [paths objectAtIndex:0];
-                return [NSString stringWithFormat:@"%@/%@",directory,[format stringFromDate:date]];
+                [format setDateFormat:@"yyyy-MM-dd'T'HH-mm-ss.SSS'JST'"];
+                return [NSString stringWithFormat:@"%@/%@.%@",directory,[format stringFromDate:date],extension];
             }
             
         public:
@@ -614,7 +624,14 @@ namespace MultiTrackQTMovie {
             VideoRecorder(NSString *fileName, std::vector<TrackInfo> *info) {
                 
                 if(fileName) this->_path = fileName;
-                else this->_path = [NSString stringWithFormat:@"%@.mov",this->filename()];
+                else {
+#if TARGET_OS_OSX
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSMoviesDirectory,NSUserDomainMask,YES);
+#else
+                    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES);
+#endif
+                    this->_path = this->filePath([paths objectAtIndex:0],@"mov");
+                }
                 this->_info = info;
             }
         
@@ -640,14 +657,33 @@ namespace MultiTrackQTMovie {
                 
             dispatch_source_t _timer = nullptr;
             std::vector<Buffer *> *_queue;
+            std::vector<long> *_list;
             SampleData * _mdat = nullptr;
-                    
+            
+            unsigned char *_jpeg = nullptr;
+
+        
             void inialized() {
                 
                 if(this->_info->size()>=1) {
                     this->_queue = new std::vector<Buffer *>[this->_info->size()];
+                    this->_list = new std::vector<long>[this->_info->size()];
                 }
                 
+#ifdef USE_JPEG_ENCODE
+                
+                int w = (*this->_info)[0].width;
+                int h = (*this->_info)[0].height;
+                
+                const unsigned long trackNum = this->_info->size();
+                for(int n=0; n<trackNum; n++) {
+                    if(w<(*this->_info)[0].width) w = (*this->_info)[0].width;
+                    if(h>(*this->_info)[0].height) h = (*this->_info)[0].height;
+                }
+                
+                this->_jpeg = tjAlloc((int)tjBufSizeYUV2(w,2,h,TJSAMP_420));
+#endif
+                                
                 MultiTrackQTMovie::ftyp *ftyp = new MultiTrackQTMovie::ftyp();
                 
                 unsigned long length = 0;
@@ -671,7 +707,7 @@ namespace MultiTrackQTMovie {
         
             void setup() {
                 this->_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER,0,0,dispatch_queue_create("ENTER_FRAME",0));
-                dispatch_source_set_timer(this->_timer,DISPATCH_TIME_NOW,NSEC_PER_SEC/300.0,0);
+                dispatch_source_set_timer(this->_timer,DISPATCH_TIME_NOW,NSEC_PER_SEC/120.0,0);
                 dispatch_source_set_event_handler(this->_timer,^{
                     
                     if(!(this->_isSaving||this->_isRunning)) return;
@@ -681,28 +717,46 @@ namespace MultiTrackQTMovie {
                     bool finished[trackNum];
                     for(int n=0; n<trackNum; n++) {
                         
-                        unsigned long size = this->_queue[n].size();
-                        
-                        finished[n] = (size==0)?true:false;
-                        
-                        for(int k=0; k<size; k++) {
-
-                            if(this->_queue[n][k]) {
-                                 
-                                bool keyframe = this->_queue[n][k]->keyframe();
-                                unsigned int length = this->_queue[n][k]->length();
-                                unsigned char *bytes = this->_queue[n][k]->bytes();
-                                
-                                this->_mdat->writeData(this->_handle,bytes,length,keyframe,n);
-                                
-                                delete this->_queue[n][k];
-                                this->_queue[n][k] = nullptr;
-                                
-                                break;
-                            }
+                        long size = this->_list[n].size();
+                        if(size>0) {
                             
-                            if(k==size-1) finished[n] = true;
+                            long inedx = this->_list[n][0];
+                            
+                            bool keyframe = this->_queue[n][inedx]->keyframe();
+                            unsigned int length = this->_queue[n][inedx]->length();
+                            unsigned char *bytes = this->_queue[n][inedx]->bytes();
+                            
+#ifdef USE_JPEG_ENCODE
+                            if((*this->_info)[n].encode&&(*this->_info)[n].codec=="jpeg") {
+                                
+                                int width = (*this->_info)[n].width;
+                                int height = (*this->_info)[n].height;
+                                
+                                tjhandle handle = tjInitCompress();
+                                if(handle) {
+                                    unsigned long size = 0;
+                                    int quality = 100;
+                                    if(tjCompressFromYUV(handle,bytes,width,2,height,TJSAMP_420,&this->_jpeg,&size,quality,TJFLAG_NOREALLOC)==0) {
+                                        this->_mdat->writeData(this->_handle,this->_jpeg,(unsigned int)size,keyframe,n);
+
+                                    }
+                                    tjDestroy(handle);
+                                }
+                            }
+                            else {
+#endif
+                                this->_mdat->writeData(this->_handle,bytes,length,keyframe,n);
+#ifdef USE_JPEG_ENCODE
+                            }
+#endif
+                            this->_queue[n][inedx]->clear();
+                            this->_list[n].erase(_list[n].begin());
                         }
+                    }
+                    
+                    for(int n=0; n<trackNum; n++) {
+                        long size = this->_list[n].size();
+                        finished[n] = (size==0)?true:false;
                     }
                     
                     int finishedTracks = 0;
@@ -723,7 +777,6 @@ namespace MultiTrackQTMovie {
                         this->_mdat->writeSize(this->_handle);
 
                         for(int n=0; n<this->_info->size(); n++) {
-                            
                             
                             if((*this->_info)[n].codec=="avc1") {
                                 avc1 = true;
@@ -801,7 +854,30 @@ namespace MultiTrackQTMovie {
                 if(!this->_isSaving) {
                     if(this->_isRunning==false) this->_isRunning = true;
                     if(trackid>=0&&trackid<this->_info->size()) {
-                        this->_queue[trackid].push_back(new Buffer(data,length,keyframe));
+                        
+                        long index = -1;
+                        
+                        long len = this->_queue[trackid].size();
+                        for(int n=0; n<len; n++) {
+                            if(this->_queue[trackid][n]->isOverwrite(length)) {
+                                index = n;
+                                break;
+                            }
+                        }
+                        
+                        if(index==-1) {
+                            this->_queue[trackid].push_back(new Buffer(data,length,keyframe));
+                            index =  this->_queue[trackid].size()-1;
+                        }
+                        else {
+                            this->_queue[trackid][index]->replace(data,length,keyframe);
+                        }
+                        
+                        if(trackid==0) {
+                            NSLog(@"queue %ld/%ld",index,this->_queue[trackid].size()-1);
+                        }
+                        
+                        this->_list[trackid].push_back(index);
                     }
                 }
                 return this;
@@ -815,7 +891,19 @@ namespace MultiTrackQTMovie {
             }
             
             ~Recorder() {
+                const unsigned long trackNum = this->_info->size();
+                for(int n=0; n<trackNum; n++) {
+                    long size = this->_queue[n].size();
+                    for(int k=0; k<size; k++) {
+                        delete this->_queue[n][k];
+                    }
+                    this->_queue[n].clear();
+                    this->_queue[n].shrink_to_fit();
+                }
                 
+#ifdef USE_JPEG_ENCODE
+                tjFree(this->_jpeg);
+#endif
             }
     };
 };

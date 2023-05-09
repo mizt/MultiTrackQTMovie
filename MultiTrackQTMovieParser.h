@@ -13,26 +13,28 @@ namespace MultiTrackQTMovie {
             std::vector<TrackInfo *> _info;
             std::vector<unsigned int> _totalFrames;
             std::vector<std::pair<u64,unsigned int> *> _frames;
-            std::vector<std::vector<unsigned char *>> _ps;
+            
+            unsigned char *_ps[3] = {nullptr,nullptr,nullptr};
+            
             std::vector<unsigned int> _traks;
             
 #ifdef EMSCRIPTEN
     
             unsigned char *_bytes;
             u64 _length;
+    
 #else 
         
             NSFileHandle *_handle;
-            std::vector<std::vector<NSData *>> _PS;
+            NSData *_PS[3] = {nil,nil,nil};
+
+        
 #endif
 
             void reset() {
                 this->_info.clear();
-                this->_info.shrink_to_fit();
                 this->_totalFrames.clear();
-                this->_totalFrames.shrink_to_fit();
                 this->_frames.clear();
-                this->_frames.shrink_to_fit();
             }
 
             void clear() {
@@ -40,35 +42,22 @@ namespace MultiTrackQTMovie {
                 for(int n=0; n<this->_frames.size(); n++) {
                     delete[] this->_frames[n];
                 }
-
-                this->reset();
-                
-                for(int n=0; n<this->_tracks; n++) {
-                    if(this->_ps[n][2]) delete[] this->_ps[n][2];
-                    if(this->_ps[n][1]) delete[] this->_ps[n][1];
-                    if(this->_ps[n][0]) delete[] this->_ps[n][0];
-                    
-                    this->_ps[n][2] = nullptr;
-                    this->_ps[n][1] = nullptr;
-                    this->_ps[n][0] = nullptr;
-                    
-#ifndef EMSCRIPTEN
-                    this->_PS[n][2] = nil;
-                    this->_PS[n][1] = nil;
-                    this->_PS[n][0] = nil;
-#endif
-                }
-                
-                this->_ps.clear();
-                this->_ps.shrink_to_fit();
-                
-#ifndef EMSCRIPTEN
-                this->_PS.clear();
-                this->_PS.shrink_to_fit();
-#endif
                 
                 this->_tracks = 0;
 
+                this->reset();
+                
+                if(this->_ps[2]) delete[] this->_ps[2];
+                if(this->_ps[1]) delete[] this->_ps[1];
+                if(this->_ps[0]) delete[] this->_ps[0];
+                
+                this->_ps[2] = nullptr;
+                this->_ps[1] = nullptr;
+                this->_ps[0] = nullptr;
+                
+                this->_PS[2] = nil;
+                this->_PS[1] = nil;
+                this->_PS[0] = nil;
             }
         
         public:
@@ -164,13 +153,7 @@ namespace MultiTrackQTMovie {
                 
                 std::vector<TrackInfo> info;
                                 
-                for(int n=0; n<this->_tracks; n++) {
-                    
-                    this->_ps.push_back({nullptr,nullptr,nullptr});
-
-#ifndef EMSCRIPTEN
-                    this->_PS.push_back({nil,nil,nil});
-#endif
+                for(int n=0; n<track.size(); n++) {
                     
                     TrackInfo *info = nullptr;
                     
@@ -209,13 +192,13 @@ namespace MultiTrackQTMovie {
                                             p+=2;
                                             unsigned short size = U16(p);
                                             p+=2;
-                                            this->_ps[n][num] = new unsigned char[size+4];
-                                            this->_ps[n][num][0] = 0;
-                                            this->_ps[n][num][1] = 0;
-                                            memcpy(this->_ps[n][num]+2,p-2,size+2);
-#ifndef EMSCRIPTEN
+                                            this->_ps[num] = new unsigned char[size+4];
+                                            this->_ps[num][0] = 0;
+                                            this->_ps[num][1] = 0;
+                                            memcpy(this->_ps[num]+2,p-2,size+2);
+#ifndef EMSCRIPTEN 
                                             
-                                            this->_PS[n][num] = [[NSData alloc] initWithBytes:this->_ps[n][num] length:(size+4)];
+                                            this->_PS[num] =  [[NSData alloc] initWithBytes:this->_ps[num] length:(size+4)];
 #endif
                                             
                                             if(num) p+=size;
@@ -232,22 +215,22 @@ namespace MultiTrackQTMovie {
                                     unsigned char *p = moov+k+offset;
                                     unsigned short size = U16(p);
                                     p+=2;
-                                    this->_ps[n][1] = new unsigned char[size+4];
-                                    this->_ps[n][1][0] = 0;
-                                    this->_ps[n][1][1] = 0;
-                                    memcpy(this->_ps[n][1]+2,p-2,size+2);
+                                    this->_ps[1] = new unsigned char[size+4];
+                                    this->_ps[1][0] = 0;
+                                    this->_ps[1][1] = 0;
+                                    memcpy(this->_ps[1]+2,p-2,size+2);
                                     p+=size;
                                     p++;
                                     size = U16(p);
                                     p+=2;
-                                    this->_ps[n][0] = new unsigned char[size+4];
-                                    this->_ps[n][0][0] = 0;
-                                    this->_ps[n][0][1] = 0;
-                                    memcpy(this->_ps[n][0]+2,p-2,size+2);
+                                    this->_ps[0] = new unsigned char[size+4];
+                                    this->_ps[0][0] = 0;
+                                    this->_ps[0][1] = 0;
+                                    memcpy(this->_ps[0]+2,p-2,size+2);
 #ifndef EMSCRIPTEN 
                                     
-                                    this->_PS[n][0] =  [[NSData alloc] initWithBytes:this->_ps[n][0] length:(size+4)];
-                                    this->_PS[n][1] =  [[NSData alloc] initWithBytes:this->_ps[n][1] length:(size+4)];
+                                    this->_PS[0] =  [[NSData alloc] initWithBytes:this->_ps[0] length:(size+4)];
+                                    this->_PS[1] =  [[NSData alloc] initWithBytes:this->_ps[1] length:(size+4)];
 #endif
                                 }
                             }
@@ -323,15 +306,15 @@ namespace MultiTrackQTMovie {
                 
             }
         
-            unsigned char *vps(unsigned int track=0) { return this->_ps[track][2]; };
-            unsigned char *sps(unsigned int track=0) { return this->_ps[track][1]; };
-            unsigned char *pps(unsigned int track=0) { return this->_ps[track][0]; };
+            unsigned char *vps() { return this->_ps[2]; };
+            unsigned char *sps() { return this->_ps[1]; };
+            unsigned char *pps() { return this->_ps[0]; };
 
 #ifndef EMSCRIPTEN 
 
-            NSData *VPS(unsigned int track=0) { return this->_PS[track][2]; };
-            NSData *SPS(unsigned int track=0) { return this->_PS[track][1]; };
-            NSData *PPS(unsigned int track=0) { return this->_PS[track][0]; };
+            NSData *VPS() { return this->_PS[2]; };
+            NSData *SPS() { return this->_PS[1]; };
+            NSData *PPS() { return this->_PS[0]; };
 #endif
 
 #ifdef EMSCRIPTEN 
@@ -402,10 +385,10 @@ namespace MultiTrackQTMovie {
             
 #else
         
-            NSData *get(u64 n, unsigned int track) {
-                if(n<this->_totalFrames[track]) {
-                    [this->_handle seekToOffset:this->_frames[track][n].first error:nil];
-                    return [this->_handle readDataUpToLength:this->_frames[track][n].second error:nil];
+            NSData *get(u64 n, unsigned int tracks) {
+                if(n<this->_totalFrames[tracks]) {
+                    [this->_handle seekToOffset:this->_frames[tracks][n].first error:nil];
+                    return [this->_handle readDataUpToLength:this->_frames[tracks][n].second error:nil];
                 }
                 return nil;
             }

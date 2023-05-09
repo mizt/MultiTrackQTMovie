@@ -15,6 +15,7 @@ namespace MultiTrackQTMovie {
         unsigned short height = 1080;
         unsigned short depth = 24.0;
         double fps = 30.0;
+        bool encode = false;
         std::string codec = "hvc1";
         std::string trak = "trak";
     } TrackInfo;
